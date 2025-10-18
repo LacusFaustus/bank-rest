@@ -1,7 +1,3 @@
-# Default ignored files
-/shelf/
-/workspace.xml
-
 # Maven
 target/
 pom.xml.tag
@@ -29,6 +25,7 @@ bin/
 *~.nib
 local.properties
 *.log
+*.lst
 
 # OS
 .DS_Store
@@ -37,14 +34,35 @@ Thumbs.db
 # Logs
 logs/
 *.log
+log/
+*.log.*
 
 # Database
 *.db
 *.sqlite
+*.h2.db
 
-# Application
+# Application specific
 application-local.yml
 application-dev.yml
+application-prod.yml
+/config/application-*.yml
 
 # Docker
 docker-compose.override.yml
+/.env
+
+# Build outputs
+bank-rest-*.jar
+!/target/*.jar
+
+# Temp files
+*.tmp
+*.temp
+
+# Coverage reports
+jacoco.exec
+*.exec
+
+# Dependency check
+dependency-check-report.html
