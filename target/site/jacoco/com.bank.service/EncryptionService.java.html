@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EncryptionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.service</a> &gt; <span class="el_source">EncryptionService.java</span></div><h1>EncryptionService.java</h1><pre class="source lang-java linenums">package com.bank.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+
+@Service
+public class EncryptionService {
+
+    private final String encryptionKey;
+
+    // Конструктор для тестов
+<span class="fc" id="L16">    public EncryptionService() {</span>
+<span class="fc" id="L17">        this.encryptionKey = &quot;test-encryption-key-32-chars-long!&quot;;</span>
+<span class="fc" id="L18">    }</span>
+
+<span class="nc" id="L20">    public EncryptionService(@Value(&quot;${app.encryption.key:bank-encryption-key-32-chars-long!}&quot;) String encryptionKey) {</span>
+<span class="nc" id="L21">        this.encryptionKey = encryptionKey;</span>
+<span class="nc" id="L22">    }</span>
+
+    private static final String ALGORITHM = &quot;AES&quot;;
+    private static final String TRANSFORMATION = &quot;AES/ECB/PKCS5Padding&quot;;
+
+    private SecretKeySpec getSecretKey() {
+        // Обеспечиваем ключ длиной 16, 24 или 32 байта
+<span class="fc" id="L29">        byte[] keyBytes = new byte[32];</span>
+<span class="fc" id="L30">        byte[] originalBytes = encryptionKey.getBytes();</span>
+<span class="fc" id="L31">        System.arraycopy(originalBytes, 0, keyBytes, 0, Math.min(originalBytes.length, keyBytes.length));</span>
+<span class="fc" id="L32">        return new SecretKeySpec(keyBytes, ALGORITHM);</span>
+    }
+
+    public String encrypt(String data) {
+        try {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (data == null) return null;</span>
+
+<span class="fc" id="L39">            Cipher cipher = Cipher.getInstance(TRANSFORMATION);</span>
+<span class="fc" id="L40">            cipher.init(Cipher.ENCRYPT_MODE, getSecretKey());</span>
+<span class="fc" id="L41">            byte[] encryptedBytes = cipher.doFinal(data.getBytes());</span>
+<span class="fc" id="L42">            return Base64.getEncoder().encodeToString(encryptedBytes);</span>
+<span class="nc" id="L43">        } catch (Exception e) {</span>
+<span class="nc" id="L44">            throw new RuntimeException(&quot;Error encrypting data&quot;, e);</span>
+        }
+    }
+
+    public String decrypt(String encryptedData) {
+        try {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (encryptedData == null) return null;</span>
+
+<span class="fc" id="L52">            Cipher cipher = Cipher.getInstance(TRANSFORMATION);</span>
+<span class="fc" id="L53">            cipher.init(Cipher.DECRYPT_MODE, getSecretKey());</span>
+<span class="fc" id="L54">            byte[] decodedBytes = Base64.getDecoder().decode(encryptedData);</span>
+<span class="fc" id="L55">            byte[] decryptedBytes = cipher.doFinal(decodedBytes);</span>
+<span class="fc" id="L56">            return new String(decryptedBytes);</span>
+<span class="nc" id="L57">        } catch (Exception e) {</span>
+<span class="nc" id="L58">            throw new RuntimeException(&quot;Error decrypting data&quot;, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

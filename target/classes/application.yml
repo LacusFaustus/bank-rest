@@ -1,0 +1,229 @@
+spring:
+  application:
+    name: bank-rest
+  profiles:
+    active: local
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      write-durations-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+logging:
+  level:
+    com.bank: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/bank-app.log
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bankdb
+    username: bankuser
+    password: bankpass
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      max-lifetime: 600000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    drop-first: false
+
+jwt:
+  secret: bank-rest-secret-key-2024-very-secure-and-long-32-chars!
+  expiration: 86400000
+
+app:
+  encryption:
+    key: bank-encryption-key-32-chars-long-123456789!
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+    enabled-by-default: false
+  endpoint:
+    health:
+      enabled: true
+      show-details: when_authorized
+      show-components: when_authorized
+    metrics:
+      enabled: true
+    info:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:bankdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: never
+  liquibase:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+jwt:
+  secret: local-secret-key-for-development-32-chars-long!
+  expiration: 86400000
+
+app:
+  encryption:
+    key: local-encryption-key-32-chars-long-123!
+
+logging:
+  level:
+    com.bank: DEBUG
+    org.springframework.security: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/bankdb}
+    username: ${DATABASE_USERNAME:bankuser}
+    password: ${DATABASE_PASSWORD:bankpass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 3
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      idle-timeout: 600000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        connection:
+          provider_disables_autocommit: true
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+jwt:
+  secret: ${JWT_SECRET:bank-rest-prod-secret-key-very-long-and-secure-32-chars!}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+app:
+  encryption:
+    key: ${ENCRYPTION_KEY:prod-encryption-key-32-chars-long-secure!}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /management
+    enabled-by-default: false
+  endpoint:
+    health:
+      enabled: true
+      show-details: never
+      show-components: never
+    metrics:
+      enabled: true
+    info:
+      enabled: true
+  health:
+    db:
+      enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.bank: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+  file:
+    name: /var/log/bank-app/bank-rest.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 1GB
+
+server:
+  forward-headers-strategy: framework
+  tomcat:
+    max-connections: 10000
+    max-http-header-size: 8KB
+    threads:
+      max: 200
+      min-spare: 10

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaginatedResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.dto</a> &gt; <span class="el_source">PaginatedResponse.java</span></div><h1>PaginatedResponse.java</h1><pre class="source lang-java linenums">package com.bank.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Page;
+
+import java.util.List;
+
+<span class="nc bnc" id="L10" title="All 22 branches missed.">@Data</span>
+<span class="nc" id="L11">@NoArgsConstructor</span>
+<span class="nc" id="L12">@AllArgsConstructor</span>
+public class PaginatedResponse&lt;T&gt; {
+<span class="nc" id="L14">    private List&lt;T&gt; content;</span>
+<span class="nc" id="L15">    private PaginationMetadata pagination;</span>
+
+<span class="nc bnc" id="L17" title="All 22 branches missed.">    @Data</span>
+<span class="nc" id="L18">    @NoArgsConstructor</span>
+<span class="nc" id="L19">    @AllArgsConstructor</span>
+    public static class PaginationMetadata {
+<span class="nc" id="L21">        private int currentPage;</span>
+<span class="nc" id="L22">        private int pageSize;</span>
+<span class="nc" id="L23">        private long totalElements;</span>
+<span class="nc" id="L24">        private int totalPages;</span>
+<span class="nc" id="L25">        private boolean first;</span>
+<span class="nc" id="L26">        private boolean last;</span>
+    }
+
+    public static &lt;T&gt; PaginatedResponse&lt;T&gt; of(Page&lt;T&gt; page) {
+<span class="nc" id="L30">        PaginationMetadata metadata = new PaginationMetadata(</span>
+<span class="nc" id="L31">                page.getNumber(),</span>
+<span class="nc" id="L32">                page.getSize(),</span>
+<span class="nc" id="L33">                page.getTotalElements(),</span>
+<span class="nc" id="L34">                page.getTotalPages(),</span>
+<span class="nc" id="L35">                page.isFirst(),</span>
+<span class="nc" id="L36">                page.isLast()</span>
+        );
+<span class="nc" id="L38">        return new PaginatedResponse&lt;&gt;(page.getContent(), metadata);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

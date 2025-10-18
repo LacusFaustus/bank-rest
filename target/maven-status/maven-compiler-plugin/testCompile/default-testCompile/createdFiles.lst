@@ -1,0 +1,7 @@
+com\bank\security\JwtTokenProviderTest.class
+com\bank\service\CardServiceTest.class
+com\bank\service\UserServiceTest.class
+com\bank\service\AuthServiceTest.class
+com\bank\service\PasswordPolicyServiceTest.class
+com\bank\service\TransactionReportServiceTest.class
+com\bank\service\EncryptionServiceTest.class

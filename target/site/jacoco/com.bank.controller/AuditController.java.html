@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.controller</a> &gt; <span class="el_source">AuditController.java</span></div><h1>AuditController.java</h1><pre class="source lang-java linenums">package com.bank.controller;
+
+import com.bank.dto.PaginatedResponse;
+import com.bank.entity.AuditLog;
+import com.bank.repository.AuditLogRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+
+@RestController
+@RequestMapping(&quot;/api/admin/audit&quot;)
+@PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+<span class="nc" id="L19">@RequiredArgsConstructor</span>
+public class AuditController {
+
+    private final AuditLogRepository auditLogRepository;
+
+    @GetMapping
+    public ResponseEntity&lt;PaginatedResponse&lt;AuditLog&gt;&gt; getAuditLogs(
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;50&quot;) int size,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String actionType,
+            @RequestParam(required = false) Boolean success,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (startDate == null) startDate = LocalDateTime.now().minusDays(7);</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        if (endDate == null) endDate = LocalDateTime.now();</span>
+
+<span class="nc" id="L37">        Page&lt;AuditLog&gt; auditLogs = auditLogRepository.findWithFilters(</span>
+<span class="nc" id="L38">                username, actionType, success, startDate, endDate, PageRequest.of(page, size));</span>
+
+<span class="nc" id="L40">        return ResponseEntity.ok(PaginatedResponse.of(auditLogs));</span>
+    }
+
+    @GetMapping(&quot;/user/{username}&quot;)
+    public ResponseEntity&lt;PaginatedResponse&lt;AuditLog&gt;&gt; getUserAuditLogs(
+            @PathVariable String username,
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;50&quot;) int size) {
+
+<span class="nc" id="L49">        Page&lt;AuditLog&gt; auditLogs = auditLogRepository.findByUsername(</span>
+<span class="nc" id="L50">                username, PageRequest.of(page, size));</span>
+
+<span class="nc" id="L52">        return ResponseEntity.ok(PaginatedResponse.of(auditLogs));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

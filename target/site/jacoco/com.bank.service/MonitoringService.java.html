@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MonitoringService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.service</a> &gt; <span class="el_source">MonitoringService.java</span></div><h1>MonitoringService.java</h1><pre class="source lang-java linenums">package com.bank.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+<span class="fc" id="L10">@Slf4j</span>
+@Service
+public class MonitoringService {
+
+<span class="nc" id="L14">    private final ConcurrentHashMap&lt;String, AtomicLong&gt; metrics = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L16">    public MonitoringService() {</span>
+        // Инициализация метрик
+<span class="nc" id="L18">        metrics.put(&quot;login.success&quot;, new AtomicLong(0));</span>
+<span class="nc" id="L19">        metrics.put(&quot;login.failure&quot;, new AtomicLong(0));</span>
+<span class="nc" id="L20">        metrics.put(&quot;transfer.completed&quot;, new AtomicLong(0));</span>
+<span class="nc" id="L21">        metrics.put(&quot;card.block.requests&quot;, new AtomicLong(0));</span>
+<span class="nc" id="L22">        metrics.put(&quot;api.requests&quot;, new AtomicLong(0));</span>
+<span class="nc" id="L23">    }</span>
+
+    public void recordSuccessfulLogin(String username) {
+<span class="nc" id="L26">        metrics.get(&quot;login.success&quot;).incrementAndGet();</span>
+<span class="nc" id="L27">        log.info(&quot;✅ Successful login for user: {}&quot;, username);</span>
+<span class="nc" id="L28">    }</span>
+
+    public void recordFailedLogin(String username) {
+<span class="nc" id="L31">        metrics.get(&quot;login.failure&quot;).incrementAndGet();</span>
+<span class="nc" id="L32">        log.warn(&quot;❌ Failed login attempt for user: {}&quot;, username);</span>
+<span class="nc" id="L33">    }</span>
+
+    public void recordTransfer(String fromUser, String toUser, BigDecimal amount) {
+<span class="nc" id="L36">        metrics.get(&quot;transfer.completed&quot;).incrementAndGet();</span>
+<span class="nc" id="L37">        log.info(&quot;💰 Transfer completed: {} from {} to {}&quot;, amount, fromUser, toUser);</span>
+<span class="nc" id="L38">    }</span>
+
+    public void recordCardBlockRequest(Long cardId, String username) {
+<span class="nc" id="L41">        metrics.get(&quot;card.block.requests&quot;).incrementAndGet();</span>
+<span class="nc" id="L42">        log.info(&quot;🚫 Card block requested: card {} by user {}&quot;, cardId, username);</span>
+<span class="nc" id="L43">    }</span>
+
+    public void recordApiRequest() {
+<span class="nc" id="L46">        metrics.get(&quot;api.requests&quot;).incrementAndGet();</span>
+<span class="nc" id="L47">    }</span>
+
+    public long getMetric(String metricName) {
+<span class="nc" id="L50">        AtomicLong metric = metrics.get(metricName);</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        return metric != null ? metric.get() : 0;</span>
+    }
+
+    public ConcurrentHashMap&lt;String, AtomicLong&gt; getAllMetrics() {
+<span class="nc" id="L55">        return new ConcurrentHashMap&lt;&gt;(metrics);</span>
+    }
+
+    public void recordSystemHealth() {
+<span class="nc" id="L59">        long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();</span>
+<span class="nc" id="L60">        long maxMemory = Runtime.getRuntime().maxMemory();</span>
+<span class="nc" id="L61">        double memoryUsage = (double) usedMemory / maxMemory * 100;</span>
+
+<span class="nc" id="L63">        log.debug(&quot;💾 Memory usage: {}/{} MB ({:.2f}%)&quot;,</span>
+<span class="nc" id="L64">                usedMemory / (1024 * 1024),</span>
+<span class="nc" id="L65">                maxMemory / (1024 * 1024),</span>
+<span class="nc" id="L66">                memoryUsage);</span>
+<span class="nc" id="L67">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataInitializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.config</a> &gt; <span class="el_source">DataInitializer.java</span></div><h1>DataInitializer.java</h1><pre class="source lang-java linenums">package com.bank.config;
+
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import com.bank.repository.CardRepository;
+import com.bank.repository.UserRepository;
+import com.bank.service.EncryptionService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+// Временно отключаем инициализатор данных для отладки
+// @Component
+// @Profile(&quot;local&quot;)
+<span class="nc" id="L22">@RequiredArgsConstructor</span>
+<span class="nc" id="L23">@Slf4j</span>
+public class DataInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final CardRepository cardRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EncryptionService encryptionService;
+
+    @Override
+    @Transactional
+    public void run(String... args) throws Exception {
+<span class="nc" id="L34">        log.info(&quot;Data initializer is temporarily disabled for debugging&quot;);</span>
+
+        // Временно закомментируем всю логику инициализации
+        /*
+        log.info(&quot;Initializing data for local development...&quot;);
+
+        // Создаем администратора
+        if (userRepository.findByUsername(&quot;admin&quot;).isEmpty()) {
+            User admin = User.builder()
+                    .username(&quot;admin&quot;)
+                    .password(passwordEncoder.encode(&quot;admin123&quot;))
+                    .email(&quot;admin@bank.com&quot;)
+                    .role(User.Role.ROLE_ADMIN)
+                    .build();
+            userRepository.save(admin);
+            log.info(&quot;Admin user created: admin/admin123&quot;);
+
+            // Создаем карту для администратора
+            String encryptedCardNumber = encryptionService.encrypt(&quot;1234567890123456&quot;);
+            log.debug(&quot;Encrypted card number length: {}&quot;, encryptedCardNumber.length());
+
+            Card adminCard = Card.builder()
+                    .cardNumber(encryptedCardNumber)
+                    .cardHolder(&quot;ADMIN USER&quot;)
+                    .expiryDate(LocalDate.now().plusYears(2))
+                    .balance(new BigDecimal(&quot;10000.00&quot;))
+                    .status(Card.CardStatus.ACTIVE)
+                    .user(admin)
+                    .build();
+            cardRepository.save(adminCard);
+            log.info(&quot;Admin card created with number: **** **** **** 3456&quot;);
+        }
+
+        // Создаем обычного пользователя
+        if (userRepository.findByUsername(&quot;user1&quot;).isEmpty()) {
+            User user = User.builder()
+                    .username(&quot;user1&quot;)
+                    .password(passwordEncoder.encode(&quot;user123&quot;))
+                    .email(&quot;user1@bank.com&quot;)
+                    .role(User.Role.ROLE_USER)
+                    .build();
+            userRepository.save(user);
+            log.info(&quot;User created: user1/user123&quot;);
+
+            // Создаем карту для пользователя
+            String encryptedCardNumber = encryptionService.encrypt(&quot;9876543210987654&quot;);
+            Card userCard = Card.builder()
+                    .cardNumber(encryptedCardNumber)
+                    .cardHolder(&quot;USER ONE&quot;)
+                    .expiryDate(LocalDate.now().plusYears(1))
+                    .balance(new BigDecimal(&quot;5000.00&quot;))
+                    .status(Card.CardStatus.ACTIVE)
+                    .user(user)
+                    .build();
+            cardRepository.save(userCard);
+            log.info(&quot;User card created with number: **** **** **** 7654&quot;);
+        }
+
+        log.info(&quot;Data initialization completed&quot;);
+
+        // Выводим информацию для доступа
+        log.info(&quot;=== Local Development Info ===&quot;);
+        log.info(&quot;H2 Console: http://localhost:8080/h2-console&quot;);
+        log.info(&quot;JDBC URL: jdbc:h2:mem:bankdb&quot;);
+        log.info(&quot;Username: sa&quot;);
+        log.info(&quot;Password: (empty)&quot;);
+        log.info(&quot;Swagger UI: http://localhost:8080/swagger-ui.html&quot;);
+        log.info(&quot;=== Available Users ===&quot;);
+        log.info(&quot;Admin: admin/admin123&quot;);
+        log.info(&quot;User: user1/user123&quot;);
+        log.info(&quot;==============================&quot;);
+        */
+<span class="nc" id="L106">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

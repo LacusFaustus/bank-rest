@@ -1,0 +1,81 @@
+Из логов видно, что:
+
+✅ Spring Boot запущен на порту 8080
+
+✅ H2 база данных инициализирована
+
+✅ Все таблицы созданы (users, cards, transactions, audit_logs)
+
+✅ JWT Security настроен корректно
+
+✅ Тестовые пользователи созданы:
+
+Admin: admin/admin123
+
+User: user1/user123
+
+🌐 Доступные endpoints:
+🔐 Аутентификация
+POST http://localhost:8080/api/auth/login
+
+POST http://localhost:8080/api/auth/validate
+
+💳 Карты (требуют аутентификацию)
+GET http://localhost:8080/api/cards - список карт пользователя
+
+GET http://localhost:8080/api/cards/{id} - информация о карте
+
+POST http://localhost:8080/api/cards/transfer - перевод между картами
+
+POST http://localhost:8080/api/cards/{id}/block-request - запрос блокировки
+
+👨‍💼 Админ endpoints (требуют роль ADMIN)
+GET http://localhost:8080/api/admin/cards - все карты
+
+POST http://localhost:8080/api/admin/cards - создать карту
+
+PUT http://localhost:8080/api/admin/cards/{id}/status - изменить статус
+
+DELETE http://localhost:8080/api/admin/cards/{id} - удалить карту
+
+🛠 Инструменты разработки:
+1. H2 Console (база данных)
+text
+URL: http://localhost:8080/h2-console
+JDBC URL: jdbc:h2:mem:bankdb
+Username: sa
+Password: (пусто)
+2. Swagger UI (документация API)
+text
+URL: http://localhost:8080/swagger-ui.html
+3. Actuator (мониторинг)
+text
+URL: http://localhost:8080/actuator/health
+🚀 Тестирование API:
+1. Получить JWT токен:
+bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+2. Использовать токен для доступа к API:
+bash
+curl -X GET http://localhost:8080/api/cards \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+📋 Что работает:
+✅ JWT аутентификация
+
+✅ Управление картами
+
+✅ Переводы между картами
+
+✅ Ролевая модель (USER/ADMIN)
+
+✅ Валидация данных
+
+✅ Шифрование данных карт
+
+✅ Логирование и аудит
+
+✅ Документация OpenAPI
+
+Приложение полностью готово к использованию! Вы можете начать тестирование API через Swagger UI или используя curl команды.

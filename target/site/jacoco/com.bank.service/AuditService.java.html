@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.service</a> &gt; <span class="el_source">AuditService.java</span></div><h1>AuditService.java</h1><pre class="source lang-java linenums">package com.bank.service;
+
+import com.bank.entity.AuditLog;
+import com.bank.repository.AuditLogRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+<span class="fc" id="L15">@Slf4j</span>
+@Service
+<span class="nc" id="L17">@RequiredArgsConstructor</span>
+public class AuditService {
+
+    private final AuditLogRepository auditLogRepository;
+
+    @Transactional
+    public void logActivity(String actionType, String description, boolean success,
+                            String resourceId, String requestDetails, HttpServletRequest request) {
+
+<span class="nc" id="L26">        String username = getCurrentUsername();</span>
+<span class="nc" id="L27">        String ipAddress = getClientIp(request);</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        String userAgent = request != null ? request.getHeader(&quot;User-Agent&quot;) : null;</span>
+
+<span class="nc" id="L30">        AuditLog auditLog = AuditLog.builder()</span>
+<span class="nc" id="L31">                .actionType(actionType)</span>
+<span class="nc" id="L32">                .description(description)</span>
+<span class="nc" id="L33">                .username(username)</span>
+<span class="nc" id="L34">                .ipAddress(ipAddress)</span>
+<span class="nc" id="L35">                .userAgent(userAgent)</span>
+<span class="nc" id="L36">                .success(success)</span>
+<span class="nc" id="L37">                .resourceId(resourceId)</span>
+<span class="nc" id="L38">                .requestDetails(requestDetails)</span>
+<span class="nc" id="L39">                .timestamp(LocalDateTime.now())</span>
+<span class="nc" id="L40">                .build();</span>
+
+        try {
+<span class="nc" id="L43">            auditLogRepository.save(auditLog);</span>
+<span class="nc" id="L44">            log.debug(&quot;Audit log saved: {} - {}&quot;, actionType, description);</span>
+<span class="nc" id="L45">        } catch (Exception e) {</span>
+<span class="nc" id="L46">            log.error(&quot;Failed to save audit log: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L47">        }</span>
+<span class="nc" id="L48">    }</span>
+
+    public void logSecurityEvent(String actionType, String description, boolean success,
+                                 HttpServletRequest request) {
+<span class="nc" id="L52">        logActivity(actionType, description, success, null, null, request);</span>
+<span class="nc" id="L53">    }</span>
+
+    public void logTransferActivity(Long fromCardId, Long toCardId, BigDecimal amount,
+                                    boolean success, String errorMessage, HttpServletRequest request) {
+<span class="nc" id="L57">        String description = String.format(&quot;Transfer %.2f from card %d to card %d&quot;,</span>
+                amount, fromCardId, toCardId);
+<span class="nc" id="L59">        String requestDetails = String.format(&quot;{\&quot;fromCardId\&quot;: %d, \&quot;toCardId\&quot;: %d, \&quot;amount\&quot;: %.2f}&quot;,</span>
+                fromCardId, toCardId, amount);
+
+<span class="nc" id="L62">        logActivity(&quot;TRANSFER&quot;, description, success, fromCardId.toString(),</span>
+                requestDetails, request);
+
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        if (!success &amp;&amp; errorMessage != null) {</span>
+            // Дополнительный лог для ошибок
+<span class="nc" id="L67">            logActivity(&quot;TRANSFER_ERROR&quot;, errorMessage, false, fromCardId.toString(),</span>
+                    requestDetails, request);
+        }
+<span class="nc" id="L70">    }</span>
+
+    private String getCurrentUsername() {
+        try {
+<span class="nc" id="L74">            return SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L75">        } catch (Exception e) {</span>
+<span class="nc" id="L76">            return &quot;SYSTEM&quot;;</span>
+        }
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (request == null) return &quot;unknown&quot;;</span>
+
+<span class="nc" id="L83">        String xfHeader = request.getHeader(&quot;X-Forwarded-For&quot;);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (xfHeader != null) {</span>
+<span class="nc" id="L85">            return xfHeader.split(&quot;,&quot;)[0];</span>
+        }
+<span class="nc" id="L87">        return request.getRemoteAddr();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

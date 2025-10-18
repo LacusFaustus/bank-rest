@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        show_sql: false
+  h2:
+    console:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-value: test-secret
+
+jwt:
+  secret: test-secret-key-very-long-secret-key-for-testing-purposes-here
+  expiration: 86400000
+
+app:
+  encryption:
+    key: test-encryption-key-32-chars-long!
+
+logging:
+  level:
+    com.bank: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.springframework.security: WARN

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.repository</a> &gt; <span class="el_source">CardRepository.java</span></div><h1>CardRepository.java</h1><pre class="source lang-java linenums">package com.bank.repository;
+
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface CardRepository extends JpaRepository&lt;Card, Long&gt; {
+    Page&lt;Card&gt; findByUser(User user, Pageable pageable);
+
+    @Query(&quot;SELECT c FROM Card c WHERE c.user = :user AND &quot; +
+            &quot;(LOWER(c.cardHolder) LIKE LOWER(CONCAT('%', :search, '%')) OR &quot; +
+            &quot;CAST(c.id AS string) LIKE CONCAT('%', :search, '%'))&quot;)
+    Page&lt;Card&gt; findByUserAndSearch(@Param(&quot;user&quot;) User user,
+                                   @Param(&quot;search&quot;) String search,
+                                   Pageable pageable);
+
+    List&lt;Card&gt; findByUserAndStatus(User user, Card.CardStatus status);
+
+    List&lt;Card&gt; findByStatusAndExpiryDateBefore(Card.CardStatus status, LocalDate expiryDate);
+
+    @Query(&quot;SELECT c FROM Card c WHERE c.user = :user AND c.status = 'ACTIVE' AND c.expiryDate &gt; CURRENT_DATE&quot;)
+    List&lt;Card&gt; findActiveUserCards(User user);
+
+    Page&lt;Card&gt; findAll(Pageable pageable);
+
+    Optional&lt;Card&gt; findByIdAndUser(Long id, User user);
+
+    boolean existsByCardNumber(String cardNumber);
+
+    @Query(&quot;SELECT COUNT(c) &gt; 0 FROM Card c WHERE c.id = :cardId AND c.user.id = :userId&quot;)
+    boolean existsByIdAndUserId(@Param(&quot;cardId&quot;) Long cardId, @Param(&quot;userId&quot;) Long userId);
+
+    List&lt;Card&gt; findByBlockRequestedTrue();
+
+    // Упрощенная версия фильтрации - убираем сложный boolean expression
+    @Query(&quot;SELECT c FROM Card c WHERE &quot; +
+            &quot;(:status IS NULL OR c.status = :status) AND &quot; +
+            &quot;(:userId IS NULL OR c.user.id = :userId)&quot;)
+    Page&lt;Card&gt; findWithFilters(@Param(&quot;status&quot;) Card.CardStatus status,
+                               @Param(&quot;userId&quot;) Long userId,
+                               Pageable pageable);
+
+    // Отдельный метод для поиска просроченных карт
+    @Query(&quot;SELECT c FROM Card c WHERE c.expiryDate &lt; CURRENT_DATE&quot;)
+    Page&lt;Card&gt; findExpiredCards(Pageable pageable);
+
+    // Отдельный метод для поиска активных не просроченных карт
+    @Query(&quot;SELECT c FROM Card c WHERE c.expiryDate &gt;= CURRENT_DATE AND c.status = 'ACTIVE'&quot;)
+    Page&lt;Card&gt; findActiveNonExpiredCards(Pageable pageable);
+
+    @Query(&quot;SELECT COUNT(c) FROM Card c WHERE c.user.id = :userId AND c.status = 'ACTIVE'&quot;)
+    long countActiveCardsByUserId(@Param(&quot;userId&quot;) Long userId);
+
+    // Упрощенный метод для поиска по имени держателя карты
+    default Page&lt;Card&gt; findByUserAndCardHolderContainingIgnoreCase(User user, String search, Pageable pageable) {
+<span class="nc" id="L66">        return findByUserAndSearch(user, search, pageable);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

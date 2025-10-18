@@ -1,0 +1,36 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:bankdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop  # Используем create-drop для полной пересоздания таблиц
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: never
+  liquibase:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+jwt:
+  secret: local-secret-key-for-development
+  expiration: 86400000
+
+app:
+  encryption:
+    key: local-encryption-key-32-chars-long!

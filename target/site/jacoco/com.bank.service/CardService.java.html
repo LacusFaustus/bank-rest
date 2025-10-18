@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.service</a> &gt; <span class="el_source">CardService.java</span></div><h1>CardService.java</h1><pre class="source lang-java linenums">package com.bank.service;
+
+import com.bank.entity.Card;
+import com.bank.entity.Transaction;
+import com.bank.entity.User;
+import com.bank.event.CardBlockRequestedEvent;
+import com.bank.event.TransferCompletedEvent;
+import com.bank.exception.*;
+import com.bank.repository.CardRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+@Service
+<span class="fc" id="L24">@RequiredArgsConstructor</span>
+<span class="fc" id="L25">@Slf4j</span>
+public class CardService {
+
+    private final CardRepository cardRepository;
+    private final EncryptionService encryptionService;
+    private final TransactionService transactionService;
+    private final MonitoringService monitoringService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final AuditService auditService;
+
+    public Page&lt;Card&gt; getUserCards(User user, Pageable pageable, String search) {
+<span class="nc" id="L36">        log.debug(&quot;Getting cards for user: id={}, username={}&quot;, user.getId(), user.getUsername());</span>
+
+<span class="nc bnc" id="L38" title="All 4 branches missed.">        if (search != null &amp;&amp; !search.trim().isEmpty()) {</span>
+<span class="nc" id="L39">            return cardRepository.findByUserAndCardHolderContainingIgnoreCase(user, search.trim(), pageable);</span>
+        }
+
+<span class="nc" id="L42">        return cardRepository.findByUser(user, pageable);</span>
+    }
+
+    public List&lt;Card&gt; getUserActiveCards(User user) {
+<span class="nc" id="L46">        return cardRepository.findActiveUserCards(user);</span>
+    }
+
+    public Card getCardById(Long cardId, User user) {
+<span class="fc" id="L50">        log.debug(&quot;Getting card {} for user: id={}, username={}&quot;, cardId, user.getId(), user.getUsername());</span>
+
+<span class="fc" id="L52">        Card card = cardRepository.findById(cardId)</span>
+<span class="fc" id="L53">                .orElseThrow(() -&gt; new CardNotFoundException(&quot;Card not found with id: &quot; + cardId));</span>
+
+        // Проверяем, что пользователь является владельцем карты или администратором
+<span class="fc" id="L56">        boolean isOwner = card.getUser().getId().equals(user.getId());</span>
+<span class="fc" id="L57">        boolean isAdmin = user.getRole().equals(User.Role.ROLE_ADMIN);</span>
+
+<span class="fc" id="L59">        log.debug(&quot;Card user id: {}, current user id: {}, isOwner: {}, isAdmin: {}&quot;,</span>
+<span class="fc" id="L60">                card.getUser().getId(), user.getId(), isOwner, isAdmin);</span>
+
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        if (!isOwner &amp;&amp; !isAdmin) {</span>
+<span class="fc" id="L63">            throw new UnauthorizedAccessException(&quot;Access denied to card&quot;);</span>
+        }
+
+<span class="fc" id="L66">        return card;</span>
+    }
+
+    public Page&lt;Card&gt; getAllCards(Pageable pageable) {
+<span class="nc" id="L70">        return cardRepository.findAll(pageable);</span>
+    }
+
+    @Transactional
+    public void deleteCard(Long cardId) {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (!cardRepository.existsById(cardId)) {</span>
+<span class="nc" id="L76">            throw new CardNotFoundException(&quot;Card not found with id: &quot; + cardId);</span>
+        }
+<span class="nc" id="L78">        cardRepository.deleteById(cardId);</span>
+<span class="nc" id="L79">        log.info(&quot;Card deleted successfully: {}&quot;, cardId);</span>
+<span class="nc" id="L80">    }</span>
+
+    @Transactional
+    public Card createCard(Card card) {
+        // Проверка на дубликат карты
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (cardRepository.existsByCardNumber(card.getCardNumber())) {</span>
+<span class="nc" id="L86">            throw new CardAlreadyExistsException(&quot;Card with this number already exists&quot;);</span>
+        }
+
+        // Устанавливаем начальный баланс
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (card.getBalance() == null) {</span>
+<span class="nc" id="L91">            card.setBalance(BigDecimal.ZERO);</span>
+        }
+
+        // Проверяем срок действия
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (card.getExpiryDate().isBefore(LocalDate.now())) {</span>
+<span class="nc" id="L96">            card.setStatus(Card.CardStatus.EXPIRED);</span>
+        } else {
+<span class="nc" id="L98">            card.setStatus(Card.CardStatus.ACTIVE);</span>
+        }
+
+<span class="nc" id="L101">        Card savedCard = cardRepository.save(card);</span>
+<span class="nc" id="L102">        log.info(&quot;Card created successfully: {} for user {}&quot;, savedCard.getId(),</span>
+<span class="nc" id="L103">                card.getUser().getUsername());</span>
+
+        // Логируем создание карты
+<span class="nc" id="L106">        auditService.logActivity(&quot;CARD_CREATE&quot;,</span>
+<span class="nc" id="L107">                String.format(&quot;Card created: %s for user %s&quot;, savedCard.getId(), card.getUser().getUsername()),</span>
+<span class="nc" id="L108">                true, savedCard.getId().toString(), null, null);</span>
+
+<span class="nc" id="L110">        return savedCard;</span>
+    }
+
+    @Transactional
+    public Card updateCardStatus(Long cardId, Card.CardStatus status) {
+<span class="nc" id="L115">        Card card = cardRepository.findById(cardId)</span>
+<span class="nc" id="L116">                .orElseThrow(() -&gt; new CardNotFoundException(&quot;Card not found with id: &quot; + cardId));</span>
+
+<span class="nc" id="L118">        card.setStatus(status);</span>
+<span class="nc" id="L119">        Card updatedCard = cardRepository.save(card);</span>
+
+        // Логируем изменение статуса
+<span class="nc" id="L122">        auditService.logActivity(&quot;CARD_STATUS_UPDATE&quot;,</span>
+<span class="nc" id="L123">                String.format(&quot;Card status updated to %s&quot;, status),</span>
+<span class="nc" id="L124">                true, cardId.toString(), null, null);</span>
+
+<span class="nc" id="L126">        log.info(&quot;Card status updated: {} -&gt; {}&quot;, cardId, status);</span>
+<span class="nc" id="L127">        return updatedCard;</span>
+    }
+
+    @Transactional
+    public void requestCardBlock(Long cardId, User user) {
+<span class="fc" id="L132">        Card card = getCardById(cardId, user);</span>
+<span class="fc" id="L133">        card.setBlockRequested(true);</span>
+<span class="fc" id="L134">        cardRepository.save(card);</span>
+
+        // Публикуем событие запроса блокировки
+<span class="fc" id="L137">        eventPublisher.publishEvent(new CardBlockRequestedEvent(this, card, &quot;User requested block&quot;));</span>
+
+<span class="fc" id="L139">        monitoringService.recordCardBlockRequest(cardId, user.getUsername());</span>
+
+        // Логируем запрос блокировки
+<span class="fc" id="L142">        auditService.logActivity(&quot;CARD_BLOCK_REQUEST&quot;,</span>
+<span class="fc" id="L143">                String.format(&quot;Block requested for card %s&quot;, cardId),</span>
+<span class="fc" id="L144">                true, cardId.toString(), null, null);</span>
+
+<span class="fc" id="L146">        log.info(&quot;Block requested for card: {} by user: {}&quot;, cardId, user.getUsername());</span>
+<span class="fc" id="L147">    }</span>
+
+    public List&lt;Card&gt; getCardsWithBlockRequests() {
+<span class="nc" id="L150">        return cardRepository.findByBlockRequestedTrue();</span>
+    }
+
+    @Transactional
+    public void transferBetweenCards(User user, Long fromCardId, Long toCardId, BigDecimal amount) {
+<span class="nc" id="L155">        long startTime = System.currentTimeMillis();</span>
+
+        try {
+<span class="nc bnc" id="L158" title="All 4 branches missed.">            if (amount == null || amount.compareTo(BigDecimal.ZERO) &lt;= 0) {</span>
+<span class="nc" id="L159">                throw new IllegalArgumentException(&quot;Transfer amount must be positive&quot;);</span>
+            }
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (fromCardId.equals(toCardId)) {</span>
+<span class="nc" id="L163">                throw new IllegalArgumentException(&quot;Cannot transfer to the same card&quot;);</span>
+            }
+
+<span class="nc" id="L166">            Card fromCard = getCardById(fromCardId, user);</span>
+<span class="nc" id="L167">            Card toCard = getCardById(toCardId, user);</span>
+
+            // Проверяем, что обе карты принадлежат пользователю
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (!fromCard.getUser().getId().equals(user.getId()) ||</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                    !toCard.getUser().getId().equals(user.getId())) {</span>
+<span class="nc" id="L172">                throw new UnauthorizedAccessException(&quot;You can only transfer between your own cards&quot;);</span>
+            }
+
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (!fromCard.isActive()) {</span>
+<span class="nc" id="L176">                throw new IllegalStateException(&quot;Source card is not active&quot;);</span>
+            }
+
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (!toCard.isActive()) {</span>
+<span class="nc" id="L180">                throw new IllegalStateException(&quot;Destination card is not active&quot;);</span>
+            }
+
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (fromCard.getBalance().compareTo(amount) &lt; 0) {</span>
+<span class="nc" id="L184">                throw new InsufficientBalanceException(&quot;Insufficient balance for transfer&quot;);</span>
+            }
+
+            // Выполняем перевод
+<span class="nc" id="L188">            fromCard.setBalance(fromCard.getBalance().subtract(amount));</span>
+<span class="nc" id="L189">            toCard.setBalance(toCard.getBalance().add(amount));</span>
+
+<span class="nc" id="L191">            cardRepository.save(fromCard);</span>
+<span class="nc" id="L192">            cardRepository.save(toCard);</span>
+
+            // Создаем запись о транзакции
+<span class="nc" id="L195">            Transaction transaction = Transaction.builder()</span>
+<span class="nc" id="L196">                    .fromCard(fromCard)</span>
+<span class="nc" id="L197">                    .toCard(toCard)</span>
+<span class="nc" id="L198">                    .amount(amount)</span>
+<span class="nc" id="L199">                    .status(Transaction.TransactionStatus.SUCCESS)</span>
+<span class="nc" id="L200">                    .build();</span>
+
+<span class="nc" id="L202">            Transaction savedTransaction = transactionService.saveTransaction(transaction);</span>
+
+            // Публикуем событие успешного перевода
+<span class="nc" id="L205">            eventPublisher.publishEvent(new TransferCompletedEvent(this, savedTransaction, fromCard, toCard, amount));</span>
+
+<span class="nc" id="L207">            long duration = System.currentTimeMillis() - startTime;</span>
+<span class="nc" id="L208">            monitoringService.recordTransfer(user.getUsername(), toCard.getUser().getUsername(), amount);</span>
+
+            // Логируем успешный перевод
+<span class="nc" id="L211">            auditService.logActivity(&quot;TRANSFER_SUCCESS&quot;,</span>
+<span class="nc" id="L212">                    String.format(&quot;Transfer %.2f from card %s to card %s&quot;, amount, fromCardId, toCardId),</span>
+<span class="nc" id="L213">                    true, fromCardId.toString(),</span>
+<span class="nc" id="L214">                    String.format(&quot;{\&quot;fromCardId\&quot;: %d, \&quot;toCardId\&quot;: %d, \&quot;amount\&quot;: %.2f}&quot;, fromCardId, toCardId, amount),</span>
+                    null);
+
+<span class="nc" id="L217">            log.info(&quot;Transfer completed: {} from card {} to card {} ({} ms)&quot;,</span>
+<span class="nc" id="L218">                    amount, fromCardId, toCardId, duration);</span>
+
+<span class="nc" id="L220">        } catch (Exception e) {</span>
+<span class="nc" id="L221">            long duration = System.currentTimeMillis() - startTime;</span>
+
+            // Логируем неудачный перевод
+<span class="nc" id="L224">            auditService.logActivity(&quot;TRANSFER_FAILED&quot;,</span>
+<span class="nc" id="L225">                    String.format(&quot;Transfer failed: %.2f from card %s to card %s - %s&quot;, amount, fromCardId, toCardId, e.getMessage()),</span>
+<span class="nc" id="L226">                    false, fromCardId.toString(),</span>
+<span class="nc" id="L227">                    String.format(&quot;{\&quot;fromCardId\&quot;: %d, \&quot;toCardId\&quot;: %d, \&quot;amount\&quot;: %.2f}&quot;, fromCardId, toCardId, amount),</span>
+                    null);
+
+<span class="nc" id="L230">            log.error(&quot;Transfer failed: {} from card {} to card {} ({} ms) - Error: {}&quot;,</span>
+<span class="nc" id="L231">                    amount, fromCardId, toCardId, duration, e.getMessage());</span>
+<span class="nc" id="L232">            throw e;</span>
+<span class="nc" id="L233">        }</span>
+<span class="nc" id="L234">    }</span>
+
+    public String getMaskedCardNumber(String encryptedCardNumber) {
+        try {
+<span class="fc" id="L238">            String decrypted = encryptionService.decrypt(encryptedCardNumber);</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">            if (decrypted != null &amp;&amp; decrypted.length() &gt;= 4) {</span>
+<span class="fc" id="L240">                return &quot;**** **** **** &quot; + decrypted.substring(decrypted.length() - 4);</span>
+            }
+<span class="nc" id="L242">            return &quot;**** **** **** ****&quot;;</span>
+<span class="fc" id="L243">        } catch (Exception e) {</span>
+<span class="fc" id="L244">            log.warn(&quot;Error decrypting card number for masking: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L245">            return &quot;**** **** **** ****&quot;;</span>
+        }
+    }
+
+    @Scheduled(cron = &quot;0 0 0 * * ?&quot;)
+    @Transactional
+    public void checkAndUpdateExpiredCards() {
+<span class="nc" id="L252">        List&lt;Card&gt; expiredCards = cardRepository.findByStatusAndExpiryDateBefore(</span>
+<span class="nc" id="L253">                Card.CardStatus.ACTIVE, LocalDate.now());</span>
+
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        for (Card card : expiredCards) {</span>
+<span class="nc" id="L256">            card.setStatus(Card.CardStatus.EXPIRED);</span>
+<span class="nc" id="L257">            log.info(&quot;Card {} expired and was deactivated&quot;, card.getId());</span>
+
+            // Логируем автоматическое истечение срока
+<span class="nc" id="L260">            auditService.logActivity(&quot;CARD_EXPIRED_AUTO&quot;,</span>
+<span class="nc" id="L261">                    String.format(&quot;Card %s expired automatically&quot;, card.getId()),</span>
+<span class="nc" id="L262">                    true, card.getId().toString(), null, null);</span>
+<span class="nc" id="L263">        }</span>
+
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (!expiredCards.isEmpty()) {</span>
+<span class="nc" id="L266">            cardRepository.saveAll(expiredCards);</span>
+        }
+<span class="nc" id="L268">    }</span>
+
+    public boolean isCardOwnedByUser(Long cardId, User user) {
+<span class="fc" id="L271">        return cardRepository.findByIdAndUser(cardId, user).isPresent();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

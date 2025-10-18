@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RateLimitService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.service</a> &gt; <span class="el_source">RateLimitService.java</span></div><h1>RateLimitService.java</h1><pre class="source lang-java linenums">package com.bank.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+<span class="nc" id="L13">@Slf4j</span>
+@Service
+<span class="nc" id="L15">@RequiredArgsConstructor</span>
+public class RateLimitService {
+
+    private final CacheManager cacheManager;
+
+    private static final int MAX_REQUESTS_PER_MINUTE = 100;
+    private static final int MAX_LOGIN_ATTEMPTS_PER_HOUR = 5;
+    private static final int MAX_TRANSFERS_PER_DAY = 10;
+
+    public boolean isRateLimited(String key, RateLimitType type) {
+<span class="nc" id="L25">        String cacheKey = type + &quot;_&quot; + key;</span>
+<span class="nc" id="L26">        Cache cache = cacheManager.getCache(&quot;rateLimit&quot;);</span>
+
+<span class="nc" id="L28">        RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        if (rateLimitInfo == null) {</span>
+<span class="nc" id="L30">            rateLimitInfo = new RateLimitInfo();</span>
+<span class="nc" id="L31">            cache.put(cacheKey, rateLimitInfo);</span>
+        }
+
+<span class="nc" id="L34">        return rateLimitInfo.isRateLimited(type);</span>
+    }
+
+    public void recordRequest(String key, RateLimitType type) {
+<span class="nc" id="L38">        String cacheKey = type + &quot;_&quot; + key;</span>
+<span class="nc" id="L39">        Cache cache = cacheManager.getCache(&quot;rateLimit&quot;);</span>
+
+<span class="nc" id="L41">        RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (rateLimitInfo == null) {</span>
+<span class="nc" id="L43">            rateLimitInfo = new RateLimitInfo();</span>
+        }
+
+<span class="nc" id="L46">        rateLimitInfo.recordRequest(type);</span>
+<span class="nc" id="L47">        cache.put(cacheKey, rateLimitInfo);</span>
+<span class="nc" id="L48">    }</span>
+
+<span class="nc" id="L50">    public enum RateLimitType {</span>
+<span class="nc" id="L51">        API_REQUEST,</span>
+<span class="nc" id="L52">        LOGIN_ATTEMPT,</span>
+<span class="nc" id="L53">        TRANSFER_OPERATION</span>
+    }
+
+<span class="nc" id="L56">    private static class RateLimitInfo {</span>
+<span class="nc" id="L57">        private final AtomicInteger requestsLastMinute = new AtomicInteger(0);</span>
+<span class="nc" id="L58">        private final AtomicInteger loginAttemptsLastHour = new AtomicInteger(0);</span>
+<span class="nc" id="L59">        private final AtomicInteger transfersLastDay = new AtomicInteger(0);</span>
+<span class="nc" id="L60">        private LocalDateTime minuteWindowStart = LocalDateTime.now();</span>
+<span class="nc" id="L61">        private LocalDateTime hourWindowStart = LocalDateTime.now();</span>
+<span class="nc" id="L62">        private LocalDateTime dayWindowStart = LocalDateTime.now();</span>
+
+        public synchronized boolean isRateLimited(RateLimitType type) {
+<span class="nc" id="L65">            resetCountersIfNeeded();</span>
+
+<span class="nc bnc" id="L67" title="All 4 branches missed.">            switch (type) {</span>
+                case API_REQUEST:
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                    return requestsLastMinute.get() &gt;= MAX_REQUESTS_PER_MINUTE;</span>
+                case LOGIN_ATTEMPT:
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                    return loginAttemptsLastHour.get() &gt;= MAX_LOGIN_ATTEMPTS_PER_HOUR;</span>
+                case TRANSFER_OPERATION:
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                    return transfersLastDay.get() &gt;= MAX_TRANSFERS_PER_DAY;</span>
+                default:
+<span class="nc" id="L75">                    return false;</span>
+            }
+        }
+
+        public synchronized void recordRequest(RateLimitType type) {
+<span class="nc" id="L80">            resetCountersIfNeeded();</span>
+
+<span class="nc bnc" id="L82" title="All 4 branches missed.">            switch (type) {</span>
+                case API_REQUEST:
+<span class="nc" id="L84">                    requestsLastMinute.incrementAndGet();</span>
+<span class="nc" id="L85">                    break;</span>
+                case LOGIN_ATTEMPT:
+<span class="nc" id="L87">                    loginAttemptsLastHour.incrementAndGet();</span>
+<span class="nc" id="L88">                    break;</span>
+                case TRANSFER_OPERATION:
+<span class="nc" id="L90">                    transfersLastDay.incrementAndGet();</span>
+                    break;
+            }
+<span class="nc" id="L93">        }</span>
+
+        private void resetCountersIfNeeded() {
+<span class="nc" id="L96">            LocalDateTime now = LocalDateTime.now();</span>
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (now.minusMinutes(1).isAfter(minuteWindowStart)) {</span>
+<span class="nc" id="L99">                requestsLastMinute.set(0);</span>
+<span class="nc" id="L100">                minuteWindowStart = now;</span>
+            }
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (now.minusHours(1).isAfter(hourWindowStart)) {</span>
+<span class="nc" id="L104">                loginAttemptsLastHour.set(0);</span>
+<span class="nc" id="L105">                hourWindowStart = now;</span>
+            }
+
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (now.minusDays(1).isAfter(dayWindowStart)) {</span>
+<span class="nc" id="L109">                transfersLastDay.set(0);</span>
+<span class="nc" id="L110">                dayWindowStart = now;</span>
+            }
+<span class="nc" id="L112">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

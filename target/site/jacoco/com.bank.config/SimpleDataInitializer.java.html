@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleDataInitializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.config</a> &gt; <span class="el_source">SimpleDataInitializer.java</span></div><h1>SimpleDataInitializer.java</h1><pre class="source lang-java linenums">package com.bank.config;
+
+import com.bank.entity.User;
+import com.bank.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+@Profile(&quot;local&quot;)
+<span class="nc" id="L14">@RequiredArgsConstructor</span>
+<span class="nc" id="L15">@Slf4j</span>
+public class SimpleDataInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+<span class="nc" id="L23">        log.info(&quot;Creating test users...&quot;);</span>
+
+        // Создаем администратора
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        if (userRepository.findByUsername(&quot;admin&quot;).isEmpty()) {</span>
+<span class="nc" id="L27">            User admin = User.builder()</span>
+<span class="nc" id="L28">                    .username(&quot;admin&quot;)</span>
+<span class="nc" id="L29">                    .password(passwordEncoder.encode(&quot;admin123&quot;))</span>
+<span class="nc" id="L30">                    .email(&quot;admin@bank.com&quot;)</span>
+<span class="nc" id="L31">                    .role(User.Role.ROLE_ADMIN)</span>
+<span class="nc" id="L32">                    .build();</span>
+<span class="nc" id="L33">            userRepository.save(admin);</span>
+<span class="nc" id="L34">            log.info(&quot;✅ Admin user created: admin/admin123&quot;);</span>
+        }
+
+        // Создаем обычного пользователя
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        if (userRepository.findByUsername(&quot;user1&quot;).isEmpty()) {</span>
+<span class="nc" id="L39">            User user = User.builder()</span>
+<span class="nc" id="L40">                    .username(&quot;user1&quot;)</span>
+<span class="nc" id="L41">                    .password(passwordEncoder.encode(&quot;user123&quot;))</span>
+<span class="nc" id="L42">                    .email(&quot;user1@bank.com&quot;)</span>
+<span class="nc" id="L43">                    .role(User.Role.ROLE_USER)</span>
+<span class="nc" id="L44">                    .build();</span>
+<span class="nc" id="L45">            userRepository.save(user);</span>
+<span class="nc" id="L46">            log.info(&quot;✅ User created: user1/user123&quot;);</span>
+        }
+
+<span class="nc" id="L49">        log.info(&quot;✅ Test users created successfully&quot;);</span>
+<span class="nc" id="L50">        log.info(&quot;=== Test Credentials ===&quot;);</span>
+<span class="nc" id="L51">        log.info(&quot;Admin: admin/admin123&quot;);</span>
+<span class="nc" id="L52">        log.info(&quot;User:  user1/user123&quot;);</span>
+<span class="nc" id="L53">        log.info(&quot;=========================&quot;);</span>
+<span class="nc" id="L54">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

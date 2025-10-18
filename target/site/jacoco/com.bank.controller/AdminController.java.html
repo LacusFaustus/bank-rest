@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.controller</a> &gt; <span class="el_source">AdminController.java</span></div><h1>AdminController.java</h1><pre class="source lang-java linenums">package com.bank.controller;
+
+import com.bank.dto.CardResponseDTO;
+import com.bank.dto.CreateCardRequest;
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import com.bank.service.CardService;
+import com.bank.service.EncryptionService;
+import com.bank.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/admin&quot;)
+@PreAuthorize(&quot;hasRole('ADMIN')&quot;)
+<span class="nc" id="L22">@RequiredArgsConstructor</span>
+public class AdminController {
+
+    private final CardService cardService;
+    private final UserService userService;
+    private final EncryptionService encryptionService;
+
+    @PostMapping(&quot;/cards&quot;)
+    public ResponseEntity&lt;CardResponseDTO&gt; createCard(@Valid @RequestBody CreateCardRequest request) {
+<span class="nc" id="L31">        User user = userService.getUserById(request.getUserId());</span>
+
+        // Шифруем номер карты
+<span class="nc" id="L34">        String encryptedCardNumber = encryptionService.encrypt(request.getCardNumber());</span>
+
+<span class="nc" id="L36">        Card card = Card.builder()</span>
+<span class="nc" id="L37">                .cardNumber(encryptedCardNumber)</span>
+<span class="nc" id="L38">                .cardHolder(request.getCardHolder().toUpperCase())</span>
+<span class="nc" id="L39">                .expiryDate(request.getExpiryDate())</span>
+<span class="nc" id="L40">                .balance(request.getInitialBalance())</span>
+<span class="nc" id="L41">                .status(Card.CardStatus.ACTIVE)</span>
+<span class="nc" id="L42">                .user(user)</span>
+<span class="nc" id="L43">                .build();</span>
+
+<span class="nc" id="L45">        Card savedCard = cardService.createCard(card);</span>
+
+<span class="nc" id="L47">        CardResponseDTO response = CardResponseDTO.fromEntity(</span>
+                savedCard,
+<span class="nc" id="L49">                cardService.getMaskedCardNumber(savedCard.getCardNumber())</span>
+        );
+
+<span class="nc" id="L52">        return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+    }
+
+    @PutMapping(&quot;/cards/{cardId}/status&quot;)
+    public ResponseEntity&lt;CardResponseDTO&gt; updateCardStatus(
+            @PathVariable Long cardId,
+            @RequestParam Card.CardStatus status) {
+
+<span class="nc" id="L60">        Card card = cardService.updateCardStatus(cardId, status);</span>
+
+<span class="nc" id="L62">        CardResponseDTO response = CardResponseDTO.fromEntity(</span>
+                card,
+<span class="nc" id="L64">                cardService.getMaskedCardNumber(card.getCardNumber())</span>
+        );
+
+<span class="nc" id="L67">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping(&quot;/cards&quot;)
+    public ResponseEntity&lt;Page&lt;CardResponseDTO&gt;&gt; getAllCards(
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;10&quot;) int size) {
+
+<span class="nc" id="L75">        Page&lt;Card&gt; cards = cardService.getAllCards(PageRequest.of(page, size));</span>
+
+<span class="nc" id="L77">        Page&lt;CardResponseDTO&gt; response = cards.map(card -&gt;</span>
+<span class="nc" id="L78">                CardResponseDTO.fromEntity(</span>
+                        card,
+<span class="nc" id="L80">                        cardService.getMaskedCardNumber(card.getCardNumber())</span>
+                )
+        );
+
+<span class="nc" id="L84">        return ResponseEntity.ok(response);</span>
+    }
+
+    @DeleteMapping(&quot;/cards/{cardId}&quot;)
+    public ResponseEntity&lt;?&gt; deleteCard(@PathVariable Long cardId) {
+<span class="nc" id="L89">        cardService.deleteCard(cardId);</span>
+<span class="nc" id="L90">        return ResponseEntity.ok().body(&quot;Card deleted successfully&quot;);</span>
+    }
+
+    @GetMapping(&quot;/users&quot;)
+    public ResponseEntity&lt;Page&lt;User&gt;&gt; getAllUsers(
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;10&quot;) int size) {
+
+<span class="nc" id="L98">        Page&lt;User&gt; users = userService.getAllUsers(PageRequest.of(page, size));</span>
+<span class="nc" id="L99">        return ResponseEntity.ok(users);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

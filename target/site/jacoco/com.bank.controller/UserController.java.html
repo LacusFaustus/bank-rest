@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Bank REST API</a> &gt; <a href="index.source.html" class="el_package">com.bank.controller</a> &gt; <span class="el_source">UserController.java</span></div><h1>UserController.java</h1><pre class="source lang-java linenums">package com.bank.controller;
+
+import com.bank.entity.User;
+import com.bank.service.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/user&quot;)
+<span class="nc" id="L12">@RequiredArgsConstructor</span>
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping(&quot;/profile&quot;)
+    public ResponseEntity&lt;User&gt; getUserProfile(@AuthenticationPrincipal User user) {
+<span class="nc" id="L19">        User currentUser = userService.getUserByUsername(user.getUsername());</span>
+        // Не возвращаем пароль в ответе
+<span class="nc" id="L21">        currentUser.setPassword(null);</span>
+<span class="nc" id="L22">        return ResponseEntity.ok(currentUser);</span>
+    }
+
+    @GetMapping(&quot;/profile/{userId}&quot;)
+    public ResponseEntity&lt;User&gt; getUserById(@PathVariable Long userId, @AuthenticationPrincipal User currentUser) {
+        // Только админ может смотреть профили других пользователей
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        if (!currentUser.getRole().equals(User.Role.ROLE_ADMIN)) {</span>
+<span class="nc" id="L29">            return ResponseEntity.status(403).build();</span>
+        }
+
+<span class="nc" id="L32">        User user = userService.getUserById(userId);</span>
+<span class="nc" id="L33">        user.setPassword(null);</span>
+<span class="nc" id="L34">        return ResponseEntity.ok(user);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>
