@@ -2,9 +2,9 @@ package com.bank.service;
 
 import com.bank.entity.User;
 import com.bank.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -20,12 +20,8 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @InjectMocks
     private UserService userService;
-
-    @BeforeEach
-    void setUp() {
-        userService = new UserService(userRepository);
-    }
 
     @Test
     void getUserById_UserExists_ShouldReturnUser() {

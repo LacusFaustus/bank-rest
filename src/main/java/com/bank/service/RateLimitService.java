@@ -7,7 +7,6 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
@@ -25,6 +24,10 @@ public class RateLimitService {
         String cacheKey = type + "_" + key;
         Cache cache = cacheManager.getCache("rateLimit");
 
+        if (cache == null) {
+            return false;
+        }
+
         RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);
         if (rateLimitInfo == null) {
             rateLimitInfo = new RateLimitInfo();
@@ -37,6 +40,10 @@ public class RateLimitService {
     public void recordRequest(String key, RateLimitType type) {
         String cacheKey = type + "_" + key;
         Cache cache = cacheManager.getCache("rateLimit");
+
+        if (cache == null) {
+            return;
+        }
 
         RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);
         if (rateLimitInfo == null) {

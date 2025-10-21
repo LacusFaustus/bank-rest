@@ -1,20 +1,20 @@
 package com.bank.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
 
-@Data
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaginatedResponse<T> {
     private List<T> content;
     private PaginationMetadata pagination;
 
-    @Data
+    @Getter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PaginationMetadata {

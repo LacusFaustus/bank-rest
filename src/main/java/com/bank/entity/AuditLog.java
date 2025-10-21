@@ -5,13 +5,16 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "audit_logs")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString
 public class AuditLog {
 
     @Id
@@ -19,7 +22,7 @@ public class AuditLog {
     private Long id;
 
     @Column(nullable = false, length = 50)
-    private String actionType; // LOGIN, TRANSFER, CARD_CREATE, etc.
+    private String actionType;
 
     @Column(nullable = false, length = 500)
     private String description;
@@ -44,8 +47,24 @@ public class AuditLog {
     private LocalDateTime timestamp;
 
     @Column(length = 50)
-    private String resourceId; // Card ID, Transaction ID, etc.
+    private String resourceId;
 
     @Column(length = 1000)
-    private String requestDetails; // JSON with request details
+    private String requestDetails;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        AuditLog auditLog = (AuditLog) o;
+        return success == auditLog.success &&
+                Objects.equals(id, auditLog.id) &&
+                Objects.equals(actionType, auditLog.actionType) &&
+                Objects.equals(username, auditLog.username);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, actionType, username, success);
+    }
 }

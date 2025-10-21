@@ -4,7 +4,6 @@ com\bank\entity\Card$CardBuilder.class
 com\bank\entity\User$Role.class
 com\bank\service\TransactionReportService.class
 com\bank\security\CustomUserDetailsService.class
-com\bank\aspect\LoggingAspect.class
 com\bank\exception\CardAlreadyExistsException.class
 com\bank\exception\GlobalExceptionHandler.class
 com\bank\entity\AuditLog.class
@@ -13,8 +12,6 @@ com\bank\config\SimpleDataInitializer.class
 com\bank\event\handler\CardEventHandler.class
 com\bank\dto\PaginatedResponse$PaginationMetadata.class
 com\bank\entity\AuditLog$AuditLogBuilder.class
-MavenWrapperDownloader$1.class
-MavenWrapperDownloader.class
 com\bank\event\TransferCompletedEvent.class
 com\bank\service\AuthService.class
 com\bank\dto\AuthResponse.class

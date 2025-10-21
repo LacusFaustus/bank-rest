@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -61,7 +62,6 @@ public class CardController {
             @PathVariable Long cardId) {
 
         cardService.requestCardBlock(cardId, user);
-
         return ResponseEntity.ok().body("Block request submitted for card: " + cardId + ". Please contact administrator.");
     }
 

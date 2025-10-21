@@ -1,11 +1,14 @@
 package com.bank.dto;
 
-import jakarta.validation.constraints.*;
-import lombok.Data;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
-@Data
+@Getter
+@Setter
 public class TransferRequest {
     @NotNull(message = "Source card ID is required")
     private Long fromCardId;

@@ -3,12 +3,12 @@ package com.bank.dto;
 import com.bank.entity.Card;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-@Data
+@Getter
 @Builder
 public class CardResponseDTO {
     private Long id;

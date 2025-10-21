@@ -16,7 +16,7 @@ class JwtTokenProviderTest {
 
     @BeforeEach
     void setUp() {
-        jwtTokenProvider = new JwtTokenProvider();
+        jwtTokenProvider = new JwtTokenProvider("test-secret-key-very-long-secret-key-for-testing-purposes-here", 86400000);
     }
 
     @Test

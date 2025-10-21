@@ -16,23 +16,16 @@ import java.util.stream.Collectors;
 @Slf4j
 public class JwtTokenProvider {
 
-    private final String jwtSecret;
+    private final SecretKey signingKey;
     private final long jwtExpirationInMs;
-
-    // Конструктор для тестов
-    public JwtTokenProvider() {
-        this.jwtSecret = "test-secret-key-very-long-secret-key-for-testing-purposes-here";
-        this.jwtExpirationInMs = 86400000;
-    }
 
     public JwtTokenProvider(@Value("${jwt.secret:bank-rest-secret-key-2024-very-secure-and-long}") String jwtSecret,
                             @Value("${jwt.expiration:86400000}") long jwtExpirationInMs) {
-        this.jwtSecret = jwtSecret;
         this.jwtExpirationInMs = jwtExpirationInMs;
+        this.signingKey = getSigningKey(jwtSecret);
     }
 
-    private SecretKey getSigningKey() {
-        // Создаем ключ длиной 32 байта
+    private SecretKey getSigningKey(String jwtSecret) {
         byte[] keyBytes;
         if (jwtSecret.length() < 32) {
             StringBuilder sb = new StringBuilder(jwtSecret);
@@ -62,13 +55,13 @@ public class JwtTokenProvider {
                 .claim("authorities", authorities)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String getUsernameFromJWT(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(signingKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -79,7 +72,7 @@ public class JwtTokenProvider {
     public boolean validateToken(String authToken) {
         try {
             Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
+                    .setSigningKey(signingKey)
                     .build()
                     .parseClaimsJws(authToken);
             return true;

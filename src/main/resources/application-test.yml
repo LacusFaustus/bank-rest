@@ -1,38 +1,50 @@
 spring:
+  main:
+    banner-mode: off
+    allow-bean-definition-overriding: true
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
     username: sa
-    password:
+    password: ''
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
     show-sql: false
     properties:
       hibernate:
-        format_sql: false
         show_sql: false
+        format_sql: false
   h2:
     console:
       enabled: false
+  liquibase:
+    enabled: false
   security:
-    oauth2:
-      resourceserver:
-        jwt:
-          secret-value: test-secret
+    user:
+      name: testuser
+      password: testpass
 
 jwt:
-  secret: test-secret-key-very-long-secret-key-for-testing-purposes-here
-  expiration: 86400000
+  secret: test-jwt-secret-key-very-long-for-testing-1234567890
+  expiration: 3600000
 
 app:
   encryption:
-    key: test-encryption-key-32-chars-long!
+    key: test-encryption-key-32-chars-long-1234567890
 
 logging:
+  config: classpath:logback-spring.xml
   level:
-    com.bank: WARN
-    org.springframework: WARN
-    org.hibernate: WARN
+    root: WARN
+    com.bank: DEBUG
     org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      enabled: false

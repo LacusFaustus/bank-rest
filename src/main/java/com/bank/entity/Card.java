@@ -1,18 +1,22 @@
 package com.bank.entity;
 
+import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import jakarta.persistence.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "cards")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString(exclude = {"user", "cardNumber"})
 public class Card {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,8 +40,6 @@ public class Card {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private User user;
 
     @CreationTimestamp
@@ -62,5 +64,20 @@ public class Card {
 
     public boolean isBlocked() {
         return status == CardStatus.BLOCKED;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Card card = (Card) o;
+        return Objects.equals(id, card.id) &&
+                Objects.equals(cardHolder, card.cardHolder) &&
+                Objects.equals(expiryDate, card.expiryDate);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, cardHolder, expiryDate);
     }
 }

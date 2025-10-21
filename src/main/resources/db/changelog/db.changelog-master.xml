@@ -5,15 +5,8 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 
-    <changeSet id="005-add-block-requested-column" author="bank">
-        <addColumn tableName="cards">
-            <column name="block_requested" type="BOOLEAN" defaultValue="false">
-                <constraints nullable="false"/>
-            </column>
-        </addColumn>
-
-        <createIndex tableName="cards" indexName="idx_cards_block_requested">
-            <column name="block_requested"/>
-        </createIndex>
-    </changeSet>
+    <include file="db/changelog/migration/001-create-users-table.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/migration/002-create-cards-table.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/migration/003-create-transactions-table.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/migration/004-create-audit-logs-table.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

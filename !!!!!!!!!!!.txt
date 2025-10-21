@@ -1,0 +1,5397 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and test with Maven
+        run: mvn -B clean verify
+        env:
+          SPRING_PROFILES_ACTIVE: test
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: target/surefire-reports/
+          retention-days: 30
+
+package com.bank.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@Configuration
+@EnableAspectJAutoProxy
+public class AopConfig {
+}
+
+package com.bank.config;
+
+import com.bank.interceptor.RateLimitInterceptor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+@RequiredArgsConstructor
+public class AppConfig implements WebMvcConfigurer {
+
+    private final RateLimitInterceptor rateLimitInterceptor;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(rateLimitInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns("/api/auth/validate"); // Исключаем validate из rate limiting
+    }
+}
+
+package com.bank.config;
+
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import com.bank.repository.CardRepository;
+import com.bank.repository.UserRepository;
+import com.bank.service.EncryptionService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+// Временно отключаем инициализатор данных для отладки
+// @Component
+// @Profile("local")
+@RequiredArgsConstructor
+@Slf4j
+public class DataInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final CardRepository cardRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EncryptionService encryptionService;
+
+    @Override
+    @Transactional
+    public void run(String... args) throws Exception {
+        log.info("Data initializer is temporarily disabled for debugging");
+
+        // Временно закомментируем всю логику инициализации
+        /*
+        log.info("Initializing data for local development...");
+
+        // Создаем администратора
+        if (userRepository.findByUsername("admin").isEmpty()) {
+            User admin = User.builder()
+                    .username("admin")
+                    .password(passwordEncoder.encode("admin123"))
+                    .email("admin@bank.com")
+                    .role(User.Role.ROLE_ADMIN)
+                    .build();
+            userRepository.save(admin);
+            log.info("Admin user created: admin/admin123");
+
+            // Создаем карту для администратора
+            String encryptedCardNumber = encryptionService.encrypt("1234567890123456");
+            log.debug("Encrypted card number length: {}", encryptedCardNumber.length());
+
+            Card adminCard = Card.builder()
+                    .cardNumber(encryptedCardNumber)
+                    .cardHolder("ADMIN USER")
+                    .expiryDate(LocalDate.now().plusYears(2))
+                    .balance(new BigDecimal("10000.00"))
+                    .status(Card.CardStatus.ACTIVE)
+                    .user(admin)
+                    .build();
+            cardRepository.save(adminCard);
+            log.info("Admin card created with number: **** **** **** 3456");
+        }
+
+        // Создаем обычного пользователя
+        if (userRepository.findByUsername("user1").isEmpty()) {
+            User user = User.builder()
+                    .username("user1")
+                    .password(passwordEncoder.encode("user123"))
+                    .email("user1@bank.com")
+                    .role(User.Role.ROLE_USER)
+                    .build();
+            userRepository.save(user);
+            log.info("User created: user1/user123");
+
+            // Создаем карту для пользователя
+            String encryptedCardNumber = encryptionService.encrypt("9876543210987654");
+            Card userCard = Card.builder()
+                    .cardNumber(encryptedCardNumber)
+                    .cardHolder("USER ONE")
+                    .expiryDate(LocalDate.now().plusYears(1))
+                    .balance(new BigDecimal("5000.00"))
+                    .status(Card.CardStatus.ACTIVE)
+                    .user(user)
+                    .build();
+            cardRepository.save(userCard);
+            log.info("User card created with number: **** **** **** 7654");
+        }
+
+        log.info("Data initialization completed");
+
+        // Выводим информацию для доступа
+        log.info("=== Local Development Info ===");
+        log.info("H2 Console: http://localhost:8080/h2-console");
+        log.info("JDBC URL: jdbc:h2:mem:bankdb");
+        log.info("Username: sa");
+        log.info("Password: (empty)");
+        log.info("Swagger UI: http://localhost:8080/swagger-ui.html");
+        log.info("=== Available Users ===");
+        log.info("Admin: admin/admin123");
+        log.info("User: user1/user123");
+        log.info("==============================");
+        */
+    }
+}
+
+package com.bank.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.ApplicationEventMulticaster;
+import org.springframework.context.event.SimpleApplicationEventMulticaster;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.scheduling.annotation.EnableAsync;
+
+@Configuration
+@EnableAsync
+public class EventConfig {
+
+    @Bean(name = "applicationEventMulticaster")
+    public ApplicationEventMulticaster simpleApplicationEventMulticaster() {
+        SimpleApplicationEventMulticaster eventMulticaster = new SimpleApplicationEventMulticaster();
+        eventMulticaster.setTaskExecutor(new SimpleAsyncTaskExecutor());
+        return eventMulticaster;
+    }
+}
+
+package com.bank.config;
+
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class JacksonConfig {
+
+    @Bean
+    public JavaTimeModule javaTimeModule() {
+        return new JavaTimeModule();
+    }
+}
+
+package com.bank.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Bank Card Management API")
+                        .version("1.0.0")
+                        .description("REST API for managing bank cards with JWT authentication")
+                        .contact(new Contact()
+                                .name("Bank API Support")
+                                .email("api-support@bank.com")
+                                .url("https://bank.com/api"))
+                        .license(new License()
+                                .name("Apache 2.0")
+                                .url("https://www.apache.org/licenses/LICENSE-2.0")))
+                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
+                .components(new io.swagger.v3.oas.models.Components()
+                        .addSecuritySchemes("bearerAuth", new SecurityScheme()
+                                .name("bearerAuth")
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")
+                                .description("JWT token obtained from authentication endpoint")));
+    }
+}
+
+package com.bank.config;
+
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RateLimitConfig {
+
+    @Bean
+    public CacheManager rateLimitCacheManager() {
+        return new ConcurrentMapCacheManager("rateLimit");
+    }
+}
+
+package com.bank.config;
+
+import com.bank.security.JwtAuthenticationFilter;
+import com.bank.security.JwtAuthenticationEntryPoint;
+import com.bank.security.JwtTokenProvider;
+import com.bank.security.CustomUserDetailsService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationEntryPoint unauthorizedHandler;
+    private final JwtTokenProvider tokenProvider;
+    private final CustomUserDetailsService userDetailsService;
+
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+        return new JwtAuthenticationFilter(tokenProvider, userDetailsService);
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    @Profile("!test")
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return buildSecurityFilterChain(http, true);
+    }
+
+    @Bean
+    @Profile("test")
+    public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+        return buildSecurityFilterChain(http, false);
+    }
+
+    private SecurityFilterChain buildSecurityFilterChain(HttpSecurity http, boolean enableCsrf) throws Exception {
+        if (!enableCsrf) {
+            http.csrf(csrf -> csrf.disable());
+        } else {
+            http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/auth/**"));
+        }
+
+        http.exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(unauthorizedHandler)
+                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authorizeHttpRequests(authz -> authz
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
+                );
+
+        // Для H2 console
+        http.headers(headers -> headers.frameOptions(frame -> frame.disable()));
+
+        http.authenticationProvider(authenticationProvider());
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
+
+package com.bank.config;
+
+import com.bank.entity.User;
+import com.bank.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+@Profile("local")
+@RequiredArgsConstructor
+@Slf4j
+public class SimpleDataInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+        log.info("Creating test users...");
+
+        // Создаем администратора
+        if (userRepository.findByUsername("admin").isEmpty()) {
+            User admin = User.builder()
+                    .username("admin")
+                    .password(passwordEncoder.encode("admin123"))
+                    .email("admin@bank.com")
+                    .role(User.Role.ROLE_ADMIN)
+                    .build();
+            userRepository.save(admin);
+            log.info("✅ Admin user created: admin/admin123");
+        }
+
+        // Создаем обычного пользователя
+        if (userRepository.findByUsername("user1").isEmpty()) {
+            User user = User.builder()
+                    .username("user1")
+                    .password(passwordEncoder.encode("user123"))
+                    .email("user1@bank.com")
+                    .role(User.Role.ROLE_USER)
+                    .build();
+            userRepository.save(user);
+            log.info("✅ User created: user1/user123");
+        }
+
+        log.info("✅ Test users created successfully");
+        log.info("=== Test Credentials ===");
+        log.info("Admin: admin/admin123");
+        log.info("User:  user1/user123");
+        log.info("=========================");
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.dto.CardResponseDTO;
+import com.bank.dto.CreateCardRequest;
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import com.bank.service.CardService;
+import com.bank.service.EncryptionService;
+import com.bank.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
+public class AdminController {
+
+    private final CardService cardService;
+    private final UserService userService;
+    private final EncryptionService encryptionService;
+
+    @PostMapping("/cards")
+    public ResponseEntity<CardResponseDTO> createCard(@Valid @RequestBody CreateCardRequest request) {
+        User user = userService.getUserById(request.getUserId());
+
+        // Шифруем номер карты
+        String encryptedCardNumber = encryptionService.encrypt(request.getCardNumber());
+
+        Card card = Card.builder()
+                .cardNumber(encryptedCardNumber)
+                .cardHolder(request.getCardHolder().toUpperCase())
+                .expiryDate(request.getExpiryDate())
+                .balance(request.getInitialBalance())
+                .status(Card.CardStatus.ACTIVE)
+                .user(user)
+                .build();
+
+        Card savedCard = cardService.createCard(card);
+
+        CardResponseDTO response = CardResponseDTO.fromEntity(
+                savedCard,
+                cardService.getMaskedCardNumber(savedCard.getCardNumber())
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/cards/{cardId}/status")
+    public ResponseEntity<CardResponseDTO> updateCardStatus(
+            @PathVariable Long cardId,
+            @RequestParam Card.CardStatus status) {
+
+        Card card = cardService.updateCardStatus(cardId, status);
+
+        CardResponseDTO response = CardResponseDTO.fromEntity(
+                card,
+                cardService.getMaskedCardNumber(card.getCardNumber())
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/cards")
+    public ResponseEntity<Page<CardResponseDTO>> getAllCards(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Page<Card> cards = cardService.getAllCards(PageRequest.of(page, size));
+
+        Page<CardResponseDTO> response = cards.map(card ->
+                CardResponseDTO.fromEntity(
+                        card,
+                        cardService.getMaskedCardNumber(card.getCardNumber())
+                )
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/cards/{cardId}")
+    public ResponseEntity<?> deleteCard(@PathVariable Long cardId) {
+        cardService.deleteCard(cardId);
+        return ResponseEntity.ok().body("Card deleted successfully");
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<Page<User>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Page<User> users = userService.getAllUsers(PageRequest.of(page, size));
+        return ResponseEntity.ok(users);
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.dto.PaginatedResponse;
+import com.bank.entity.AuditLog;
+import com.bank.repository.AuditLogRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+
+@RestController
+@RequestMapping("/api/admin/audit")
+@PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
+public class AuditController {
+
+    private final AuditLogRepository auditLogRepository;
+
+    @GetMapping
+    public ResponseEntity<PaginatedResponse<AuditLog>> getAuditLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String actionType,
+            @RequestParam(required = false) Boolean success,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+
+        if (startDate == null) startDate = LocalDateTime.now().minusDays(7);
+        if (endDate == null) endDate = LocalDateTime.now();
+
+        Page<AuditLog> auditLogs = auditLogRepository.findWithFilters(
+                username, actionType, success, startDate, endDate, PageRequest.of(page, size));
+
+        return ResponseEntity.ok(PaginatedResponse.of(auditLogs));
+    }
+
+    @GetMapping("/user/{username}")
+    public ResponseEntity<PaginatedResponse<AuditLog>> getUserAuditLogs(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+
+        Page<AuditLog> auditLogs = auditLogRepository.findByUsername(
+                username, PageRequest.of(page, size));
+
+        return ResponseEntity.ok(PaginatedResponse.of(auditLogs));
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.dto.AuthRequest;
+import com.bank.dto.AuthResponse;
+import com.bank.security.JwtTokenProvider;
+import com.bank.service.AuditService;
+import com.bank.service.MonitoringService;
+import com.bank.service.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider tokenProvider;
+    private final MonitoringService monitoringService;
+    private final AuditService auditService;
+    private final RateLimitService rateLimitService;
+
+    @PostMapping("/login")
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody AuthRequest loginRequest,
+                                              HttpServletRequest request) {
+        String clientIp = getClientIp(request);
+        String rateLimitKey = clientIp + "_/api/auth/login";
+
+        // Check rate limiting
+        if (rateLimitService.isRateLimited(rateLimitKey, RateLimitService.RateLimitType.LOGIN_ATTEMPT)) {
+            auditService.logSecurityEvent("RATE_LIMIT_EXCEEDED",
+                    "Login rate limit exceeded for IP: " + clientIp, false, request);
+            return ResponseEntity.status(429).body("Rate limit exceeded. Please try again later.");
+        }
+
+        try {
+            log.debug("Attempting authentication for user: {}", loginRequest.getUsername());
+
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword()
+                    )
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = tokenProvider.generateToken(authentication);
+
+            // Record successful request
+            rateLimitService.recordRequest(rateLimitKey, RateLimitService.RateLimitType.LOGIN_ATTEMPT);
+
+            // Логируем успешную аутентификацию
+            auditService.logSecurityEvent("LOGIN_SUCCESS",
+                    "User authenticated successfully", true, request);
+            monitoringService.recordSuccessfulLogin(loginRequest.getUsername());
+
+            log.info("User {} successfully authenticated", loginRequest.getUsername());
+            return ResponseEntity.ok(new AuthResponse(jwt, "Bearer"));
+
+        } catch (BadCredentialsException e) {
+            // Record failed request
+            rateLimitService.recordRequest(rateLimitKey, RateLimitService.RateLimitType.LOGIN_ATTEMPT);
+
+            // Логируем неудачную попытку входа
+            log.warn("Authentication failed for user: {} - Invalid credentials", loginRequest.getUsername());
+            auditService.logSecurityEvent("LOGIN_FAILED",
+                    "Invalid credentials", false, request);
+            monitoringService.recordFailedLogin(loginRequest.getUsername());
+
+            return ResponseEntity.status(401).body("Invalid credentials");
+        } catch (Exception e) {
+            // Record failed request
+            rateLimitService.recordRequest(rateLimitKey, RateLimitService.RateLimitType.LOGIN_ATTEMPT);
+
+            log.error("Unexpected error during authentication for user: {}", loginRequest.getUsername(), e);
+            auditService.logSecurityEvent("LOGIN_ERROR",
+                    "Unexpected error: " + e.getMessage(), false, request);
+            return ResponseEntity.status(500).body("Authentication error");
+        }
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<?> validateToken(@RequestHeader(value = "Authorization", required = false) String token,
+                                           HttpServletRequest request) {
+        try {
+            if (token == null || !token.startsWith("Bearer ")) {
+                auditService.logSecurityEvent("TOKEN_VALIDATION_FAILED",
+                        "Invalid token format", false, request);
+                return ResponseEntity.badRequest().body("Invalid token");
+            }
+
+            String jwt = token.substring(7);
+            if (tokenProvider.validateToken(jwt)) {
+                auditService.logSecurityEvent("TOKEN_VALIDATION_SUCCESS",
+                        "Token is valid", true, request);
+                return ResponseEntity.ok().body("Token is valid");
+            }
+
+            auditService.logSecurityEvent("TOKEN_VALIDATION_FAILED",
+                    "Invalid token", false, request);
+            return ResponseEntity.badRequest().body("Invalid token");
+        } catch (Exception e) {
+            log.error("Error validating token", e);
+            auditService.logSecurityEvent("TOKEN_VALIDATION_ERROR",
+                    "Error validating token: " + e.getMessage(), false, request);
+            return ResponseEntity.status(500).body("Token validation error");
+        }
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader != null) {
+            return xfHeader.split(",")[0];
+        }
+        return request.getRemoteAddr();
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.dto.CardResponseDTO;
+import com.bank.dto.TransferRequest;
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import com.bank.service.CardService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+
+@RestController
+@RequestMapping("/api/cards")
+@RequiredArgsConstructor
+public class CardController {
+
+    private final CardService cardService;
+
+    @GetMapping
+    public ResponseEntity<Page<CardResponseDTO>> getUserCards(
+            @AuthenticationPrincipal User user,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search) {
+
+        Page<Card> cards = cardService.getUserCards(user, PageRequest.of(page, size), search);
+
+        Page<CardResponseDTO> response = cards.map(card ->
+                CardResponseDTO.fromEntity(
+                        card,
+                        cardService.getMaskedCardNumber(card.getCardNumber())
+                )
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{cardId}")
+    public ResponseEntity<CardResponseDTO> getCard(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long cardId) {
+
+        Card card = cardService.getCardById(cardId, user);
+        CardResponseDTO response = CardResponseDTO.fromEntity(
+                card,
+                cardService.getMaskedCardNumber(card.getCardNumber())
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{cardId}/block-request")
+    public ResponseEntity<?> requestBlockCard(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long cardId) {
+
+        cardService.requestCardBlock(cardId, user);
+        return ResponseEntity.ok().body("Block request submitted for card: " + cardId + ". Please contact administrator.");
+    }
+
+    @PostMapping("/transfer")
+    public ResponseEntity<?> transferBetweenCards(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody TransferRequest request) {
+
+        cardService.transferBetweenCards(user, request.getFromCardId(),
+                request.getToCardId(), request.getAmount());
+
+        return ResponseEntity.ok().body("Transfer completed successfully");
+    }
+
+    @GetMapping("/{cardId}/balance")
+    public ResponseEntity<BigDecimal> getCardBalance(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long cardId) {
+
+        Card card = cardService.getCardById(cardId, user);
+        return ResponseEntity.ok(card.getBalance());
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.service.MonitoringService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+@RestController
+@RequestMapping("/api/admin/monitoring")
+@PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
+public class MonitoringController {
+
+    private final MonitoringService monitoringService;
+
+    @GetMapping("/metrics")
+    public ResponseEntity<Map<String, Long>> getMetrics() {
+        ConcurrentHashMap<String, Long> metrics = new ConcurrentHashMap<>();
+        monitoringService.getAllMetrics().forEach((key, value) -> metrics.put(key, value.get()));
+
+        return ResponseEntity.ok(metrics);
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> getHealth() {
+        Map<String, Object> health = Map.of(
+                "status", "UP",
+                "timestamp", System.currentTimeMillis(),
+                "memoryUsage", getMemoryUsage()
+        );
+
+        return ResponseEntity.ok(health);
+    }
+
+    private Map<String, Object> getMemoryUsage() {
+        Runtime runtime = Runtime.getRuntime();
+        long usedMemory = runtime.totalMemory() - runtime.freeMemory();
+        long maxMemory = runtime.maxMemory();
+        double memoryUsagePercent = (double) usedMemory / maxMemory * 100;
+
+        return Map.of(
+                "usedMemoryMB", usedMemory / (1024 * 1024),
+                "maxMemoryMB", maxMemory / (1024 * 1024),
+                "usagePercent", String.format("%.2f%%", memoryUsagePercent)
+        );
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.service.TransactionReportService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/reports")
+@RequiredArgsConstructor
+public class ReportController {
+
+    private final TransactionReportService transactionReportService;
+
+    @GetMapping("/daily")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getDailyReport() {
+        Map<String, Object> report = transactionReportService.getDailyTransactionReport();
+        return ResponseEntity.ok(report);
+    }
+
+    @GetMapping("/my-stats")
+    public ResponseEntity<Map<String, Object>> getUserStats(@AuthenticationPrincipal com.bank.entity.User user) {
+        Map<String, Object> stats = transactionReportService.getUserTransactionStats(user.getId());
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> healthCheck() {
+        return ResponseEntity.ok(Map.of("status", "OK", "service", "Bank REST API"));
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.entity.User;
+import com.bank.service.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/user")
+@RequiredArgsConstructor
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/profile")
+    public ResponseEntity<User> getUserProfile(@AuthenticationPrincipal User user) {
+        User currentUser = userService.getUserByUsername(user.getUsername());
+        // Не возвращаем пароль в ответе
+        currentUser.setPassword(null);
+        return ResponseEntity.ok(currentUser);
+    }
+
+    @GetMapping("/profile/{userId}")
+    public ResponseEntity<User> getUserById(@PathVariable Long userId, @AuthenticationPrincipal User currentUser) {
+        // Только админ может смотреть профили других пользователей
+        if (!currentUser.getRole().equals(User.Role.ROLE_ADMIN)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        User user = userService.getUserById(userId);
+        user.setPassword(null);
+        return ResponseEntity.ok(user);
+    }
+}
+
+package com.bank.dto;
+
+import com.bank.validation.StrongPassword;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class AuthRequest {
+    @NotBlank(message = "Username is required")
+    private String username;
+
+    @NotBlank(message = "Password is required")
+    @StrongPassword
+    private String password;
+}
+
+package com.bank.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
+public class AuthResponse {
+    private String accessToken;
+    private String tokenType;
+}
+
+package com.bank.dto;
+
+import com.bank.entity.Card;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Getter
+@Builder
+public class CardResponseDTO {
+    private Long id;
+    private String cardNumber;
+    private String cardHolder;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate expiryDate;
+
+    private BigDecimal balance;
+    private Card.CardStatus status;
+    private String userUsername;
+
+    public static CardResponseDTO fromEntity(Card card, String maskedCardNumber) {
+        return CardResponseDTO.builder()
+                .id(card.getId())
+                .cardNumber(maskedCardNumber)
+                .cardHolder(card.getCardHolder())
+                .expiryDate(card.getExpiryDate())
+                .balance(card.getBalance())
+                .status(card.getStatus())
+                .userUsername(card.getUser() != null ? card.getUser().getUsername() : null)
+                .build();
+    }
+}
+
+package com.bank.dto;
+
+import jakarta.validation.constraints.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Getter
+@Setter
+public class CreateCardRequest {
+    @NotBlank(message = "Card number is required")
+    @Pattern(regexp = "\\d{16}", message = "Card number must be 16 digits")
+    private String cardNumber;
+
+    @NotBlank(message = "Card holder is required")
+    @Size(min = 2, max = 100, message = "Card holder name must be between 2 and 100 characters")
+    private String cardHolder;
+
+    @NotNull(message = "Expiry date is required")
+    @Future(message = "Expiry date must be in the future")
+    private LocalDate expiryDate;
+
+    @NotNull(message = "Initial balance is required")
+    @DecimalMin(value = "0.0", message = "Balance must be positive")
+    private BigDecimal initialBalance;
+
+    @NotNull(message = "User ID is required")
+    private Long userId;
+}
+
+package com.bank.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@AllArgsConstructor
+public class ErrorResponse {
+    private LocalDateTime timestamp;
+    private int status;
+    private String error;
+    private String message;
+    private String path;
+}
+
+package com.bank.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Page;
+
+import java.util.List;
+
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+public class PaginatedResponse<T> {
+    private List<T> content;
+    private PaginationMetadata pagination;
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PaginationMetadata {
+        private int currentPage;
+        private int pageSize;
+        private long totalElements;
+        private int totalPages;
+        private boolean first;
+        private boolean last;
+    }
+
+    public static <T> PaginatedResponse<T> of(Page<T> page) {
+        PaginationMetadata metadata = new PaginationMetadata(
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isFirst(),
+                page.isLast()
+        );
+        return new PaginatedResponse<>(page.getContent(), metadata);
+    }
+}
+
+package com.bank.dto;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+
+@Getter
+@Setter
+public class TransferRequest {
+    @NotNull(message = "Source card ID is required")
+    private Long fromCardId;
+
+    @NotNull(message = "Destination card ID is required")
+    private Long toCardId;
+
+    @NotNull(message = "Amount is required")
+    @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
+    private BigDecimal amount;
+}
+
+package com.bank.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+import java.util.Objects;
+
+@Entity
+@Table(name = "audit_logs")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString
+public class AuditLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 50)
+    private String actionType;
+
+    @Column(nullable = false, length = 500)
+    private String description;
+
+    @Column(nullable = false, length = 100)
+    private String username;
+
+    @Column(length = 45)
+    private String ipAddress;
+
+    @Column(length = 500)
+    private String userAgent;
+
+    @Column(nullable = false)
+    private boolean success;
+
+    @Column(length = 1000)
+    private String errorMessage;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime timestamp;
+
+    @Column(length = 50)
+    private String resourceId;
+
+    @Column(length = 1000)
+    private String requestDetails;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        AuditLog auditLog = (AuditLog) o;
+        return success == auditLog.success &&
+                Objects.equals(id, auditLog.id) &&
+                Objects.equals(actionType, auditLog.actionType) &&
+                Objects.equals(username, auditLog.username);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, actionType, username, success);
+    }
+}
+
+package com.bank.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Objects;
+
+@Entity
+@Table(name = "cards")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = {"user", "cardNumber"})
+public class Card {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "card_number", nullable = false, length = 255)
+    private String cardNumber;
+
+    @Column(name = "card_holder", nullable = false, length = 100)
+    private String cardHolder;
+
+    @Column(name = "expiry_date", nullable = false)
+    private LocalDate expiryDate;
+
+    @Column(nullable = false, precision = 15, scale = 2)
+    private BigDecimal balance;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CardStatus status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Builder.Default
+    @Column(name = "block_requested")
+    private Boolean blockRequested = false;
+
+    public enum CardStatus {
+        ACTIVE, BLOCKED, EXPIRED
+    }
+
+    public boolean isActive() {
+        return status == CardStatus.ACTIVE && !isExpired();
+    }
+
+    public boolean isExpired() {
+        return expiryDate.isBefore(LocalDate.now());
+    }
+
+    public boolean isBlocked() {
+        return status == CardStatus.BLOCKED;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Card card = (Card) o;
+        return Objects.equals(id, card.id) &&
+                Objects.equals(cardHolder, card.cardHolder) &&
+                Objects.equals(expiryDate, card.expiryDate);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, cardHolder, expiryDate);
+    }
+}
+
+package com.bank.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Objects;
+
+@Entity
+@Table(name = "transactions")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = {"fromCard", "toCard"})
+public class Transaction {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "from_card_id")
+    private Card fromCard;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "to_card_id")
+    private Card toCard;
+
+    @Column(nullable = false, precision = 15, scale = 2)
+    private BigDecimal amount;
+
+    @CreationTimestamp
+    private LocalDateTime transactionDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TransactionStatus status;
+
+    public enum TransactionStatus {
+        SUCCESS, FAILED, PENDING
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Transaction that = (Transaction) o;
+        return Objects.equals(id, that.id) &&
+                Objects.equals(amount, that.amount) &&
+                Objects.equals(transactionDate, that.transactionDate);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, amount, transactionDate);
+    }
+}
+
+package com.bank.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = "password")
+public class User implements UserDetails {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true, nullable = false, length = 50)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(unique = true, nullable = false, length = 100)
+    private String email;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Role role;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    public enum Role {
+        ROLE_USER, ROLE_ADMIN
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority(role.name()));
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return Objects.equals(id, user.id) &&
+                Objects.equals(username, user.username) &&
+                Objects.equals(email, user.email);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, username, email);
+    }
+}
+
+package com.bank.event.handler;
+
+import com.bank.entity.Card;
+import com.bank.event.CardBlockRequestedEvent;
+import com.bank.repository.CardRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class CardEventHandler {
+
+    private final CardRepository cardRepository;
+
+    @Async
+    @EventListener
+    public void handleCardBlockRequest(CardBlockRequestedEvent event) {
+        Card card = event.getCard();
+        String reason = event.getReason();
+
+        log.info("🔄 Processing card block request: Card {} for user {}, Reason: {}",
+                card.getId(), card.getUser().getUsername(), reason);
+
+        // Здесь можно добавить интеграцию с:
+        // - Email сервисом для уведомления администраторов
+        // - Системой тикетов
+        // - Slack/Teams уведомлениями
+
+        log.info("✅ Card block request processed for card: {}", card.getId());
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleCardBlockRequestTransactional(CardBlockRequestedEvent event) {
+        // Обработка после коммита транзакции
+        log.info("📧 Sending notifications for card block request: {}", event.getCard().getId());
+    }
+}
+
+package com.bank.event.handler;
+
+import com.bank.event.CardBlockRequestedEvent;
+import com.bank.event.TransferCompletedEvent;
+import com.bank.event.UserActivityEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class NotificationEventHandler {
+
+    @Async
+    @EventListener
+    public void handleCardBlockRequest(CardBlockRequestedEvent event) {
+        log.info("🔔 Card block requested notification: Card {}, Reason: {}",
+                event.getCard().getId(), event.getReason());
+
+        // Здесь можно интегрировать с:
+        // - Email сервисом
+        // - SMS уведомлениями
+        // - Slack/Teams webhooks
+        // - Системой тикетов для администраторов
+    }
+
+    @Async
+    @EventListener
+    public void handleTransferCompleted(TransferCompletedEvent event) {
+        log.info("🔔 Transfer completed: {} from card {} to card {}",
+                event.getAmount(), event.getFromCard().getId(), event.getToCard().getId());
+
+        // Уведомления пользователю о successful transfer
+    }
+
+    @Async
+    @EventListener
+    public void handleUserActivity(UserActivityEvent event) {
+        log.info("🔔 User activity: {} - {} from IP: {}",
+                event.getUser().getUsername(), event.getActivityType(), event.getIpAddress());
+
+        // Мониторинг подозрительной активности
+        if ("FAILED_LOGIN".equals(event.getActivityType())) {
+            log.warn("⚠️ Failed login attempt for user: {} from IP: {}",
+                    event.getUser().getUsername(), event.getIpAddress());
+        }
+    }
+}
+
+package com.bank.event;
+
+import com.bank.entity.Card;
+import lombok.Getter;
+import org.springframework.context.ApplicationEvent;
+
+@Getter
+public class CardBlockRequestedEvent extends ApplicationEvent {
+    private final Card card;
+    private final String reason;
+
+    public CardBlockRequestedEvent(Object source, Card card, String reason) {
+        super(source);
+        this.card = card;
+        this.reason = reason;
+    }
+}
+
+package com.bank.event;
+
+import com.bank.entity.Card;
+import com.bank.entity.Transaction;
+import lombok.Getter;
+import org.springframework.context.ApplicationEvent;
+
+import java.math.BigDecimal;
+
+@Getter
+public class TransferCompletedEvent extends ApplicationEvent {
+    private final Transaction transaction;
+    private final Card fromCard;
+    private final Card toCard;
+    private final BigDecimal amount;
+
+    public TransferCompletedEvent(Object source, Transaction transaction, Card fromCard, Card toCard, BigDecimal amount) {
+        super(source);
+        this.transaction = transaction;
+        this.fromCard = fromCard;
+        this.toCard = toCard;
+        this.amount = amount;
+    }
+}
+
+package com.bank.event;
+
+import com.bank.entity.User;
+import lombok.Getter;
+import org.springframework.context.ApplicationEvent;
+
+@Getter
+public class UserActivityEvent extends ApplicationEvent {
+    private final User user;
+    private final String activityType;
+    private final String description;
+    private final String ipAddress;
+
+    public UserActivityEvent(Object source, User user, String activityType, String description, String ipAddress) {
+        super(source);
+        this.user = user;
+        this.activityType = activityType;
+        this.description = description;
+        this.ipAddress = ipAddress;
+    }
+}
+
+package com.bank.exception;
+
+public class CardAlreadyExistsException extends RuntimeException {
+    public CardAlreadyExistsException(String message) {
+        super(message);
+    }
+}
+
+package com.bank.exception;
+
+public class CardNotFoundException extends RuntimeException {
+    public CardNotFoundException(String message) {
+        super(message);
+    }
+}
+
+package com.bank.exception;
+
+import com.bank.dto.ErrorResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+
+import java.time.LocalDateTime;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(CardNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCardNotFound(CardNotFoundException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(CardAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleCardAlreadyExists(CardAlreadyExistsException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(InsufficientBalanceException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(UnauthorizedAccessException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorizedAccess(UnauthorizedAccessException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UsernameNotFoundException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
+        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .findFirst()
+                .orElse("Validation error");
+
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Validation Error",
+                errorMessage,
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                "Access denied",
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+
+package com.bank.exception;
+
+public class InsufficientBalanceException extends RuntimeException {
+    public InsufficientBalanceException(String message) {
+        super(message);
+    }
+}
+
+package com.bank.exception;
+
+public class UnauthorizedAccessException extends RuntimeException {
+    public UnauthorizedAccessException(String message) {
+        super(message);
+    }
+}
+
+package com.bank.interceptor;
+
+import com.bank.service.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+@Component
+@RequiredArgsConstructor
+public class RateLimitInterceptor implements HandlerInterceptor {
+
+    private final RateLimitService rateLimitService;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        String clientIp = getClientIp(request);
+        String endpoint = request.getRequestURI();
+
+        // Применяем разные лимиты для разных endpoint-ов
+        RateLimitService.RateLimitType rateLimitType = getRateLimitType(endpoint);
+
+        if (rateLimitService.isRateLimited(clientIp + "_" + endpoint, rateLimitType)) {
+            response.setStatus(429); // Too Many Requests
+            response.getWriter().write("Rate limit exceeded. Please try again later.");
+            return false;
+        }
+
+        rateLimitService.recordRequest(clientIp + "_" + endpoint, rateLimitType);
+        return true;
+    }
+
+    private RateLimitService.RateLimitType getRateLimitType(String endpoint) {
+        if (endpoint.contains("/auth/login")) {
+            return RateLimitService.RateLimitType.LOGIN_ATTEMPT;
+        } else if (endpoint.contains("/transfer")) {
+            return RateLimitService.RateLimitType.TRANSFER_OPERATION;
+        } else {
+            return RateLimitService.RateLimitType.API_REQUEST;
+        }
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader != null) {
+            return xfHeader.split(",")[0];
+        }
+        return request.getRemoteAddr();
+    }
+}
+
+package com.bank.repository;
+
+import com.bank.entity.AuditLog;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+
+@Repository
+public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+
+    Page<AuditLog> findByUsername(String username, Pageable pageable);
+
+    Page<AuditLog> findByActionType(String actionType, Pageable pageable);
+
+    Page<AuditLog> findByTimestampBetween(LocalDateTime start, LocalDateTime end, Pageable pageable);
+
+    @Query("SELECT a FROM AuditLog a WHERE " +
+            "(:username IS NULL OR a.username = :username) AND " +
+            "(:actionType IS NULL OR a.actionType = :actionType) AND " +
+            "(:success IS NULL OR a.success = :success) AND " +
+            "a.timestamp BETWEEN :startDate AND :endDate")
+    Page<AuditLog> findWithFilters(@Param("username") String username,
+                                   @Param("actionType") String actionType,
+                                   @Param("success") Boolean success,
+                                   @Param("startDate") LocalDateTime startDate,
+                                   @Param("endDate") LocalDateTime endDate,
+                                   Pageable pageable);
+
+    @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.username = :username AND a.timestamp > :since")
+    long countRecentActionsByUser(@Param("username") String username,
+                                  @Param("since") LocalDateTime since);
+}
+
+package com.bank.repository;
+
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface CardRepository extends JpaRepository<Card, Long> {
+    Page<Card> findByUser(User user, Pageable pageable);
+
+    @Query("SELECT c FROM Card c WHERE c.user = :user AND " +
+            "(LOWER(c.cardHolder) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "CAST(c.id AS string) LIKE CONCAT('%', :search, '%'))")
+    Page<Card> findByUserAndSearch(@Param("user") User user,
+                                   @Param("search") String search,
+                                   Pageable pageable);
+
+    List<Card> findByUserAndStatus(User user, Card.CardStatus status);
+
+    List<Card> findByStatusAndExpiryDateBefore(Card.CardStatus status, LocalDate expiryDate);
+
+    @Query("SELECT c FROM Card c WHERE c.user = :user AND c.status = 'ACTIVE' AND c.expiryDate > CURRENT_DATE")
+    List<Card> findActiveUserCards(User user);
+
+    Page<Card> findAll(Pageable pageable);
+
+    Optional<Card> findByIdAndUser(Long id, User user);
+
+    boolean existsByCardNumber(String cardNumber);
+
+    @Query("SELECT COUNT(c) > 0 FROM Card c WHERE c.id = :cardId AND c.user.id = :userId")
+    boolean existsByIdAndUserId(@Param("cardId") Long cardId, @Param("userId") Long userId);
+
+    List<Card> findByBlockRequestedTrue();
+
+    // Упрощенная версия фильтрации - убираем сложный boolean expression
+    @Query("SELECT c FROM Card c WHERE " +
+            "(:status IS NULL OR c.status = :status) AND " +
+            "(:userId IS NULL OR c.user.id = :userId)")
+    Page<Card> findWithFilters(@Param("status") Card.CardStatus status,
+                               @Param("userId") Long userId,
+                               Pageable pageable);
+
+    // Отдельный метод для поиска просроченных карт
+    @Query("SELECT c FROM Card c WHERE c.expiryDate < CURRENT_DATE")
+    Page<Card> findExpiredCards(Pageable pageable);
+
+    // Отдельный метод для поиска активных не просроченных карт
+    @Query("SELECT c FROM Card c WHERE c.expiryDate >= CURRENT_DATE AND c.status = 'ACTIVE'")
+    Page<Card> findActiveNonExpiredCards(Pageable pageable);
+
+    @Query("SELECT COUNT(c) FROM Card c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
+    long countActiveCardsByUserId(@Param("userId") Long userId);
+
+    // Упрощенный метод для поиска по имени держателя карты
+    default Page<Card> findByUserAndCardHolderContainingIgnoreCase(User user, String search, Pageable pageable) {
+        return findByUserAndSearch(user, search, pageable);
+    }
+}
+
+package com.bank.repository;
+
+import com.bank.entity.Transaction;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Repository
+public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+
+    @Query("SELECT t FROM Transaction t WHERE t.fromCard.user.id = :userId OR t.toCard.user.id = :userId")
+    List<Transaction> findByUserId(@Param("userId") Long userId);
+
+    List<Transaction> findByTransactionDateBetween(LocalDateTime start, LocalDateTime end);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.transactionDate BETWEEN :start AND :end")
+    long countByTransactionDateBetween(@Param("start") LocalDateTime start,
+                                       @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.status = :status AND t.transactionDate BETWEEN :start AND :end")
+    long countByStatusAndTransactionDateBetween(@Param("status") Transaction.TransactionStatus status,
+                                                @Param("start") LocalDateTime start,
+                                                @Param("end") LocalDateTime end);
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.transactionDate BETWEEN :start AND :end")
+    BigDecimal sumAmountByTransactionDateBetween(@Param("start") LocalDateTime start,
+                                                 @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE " +
+            "(t.fromCard.user.id = :userId OR t.toCard.user.id = :userId) AND " +
+            "t.transactionDate >= :since")
+    long countByUserInLast30Days(@Param("userId") Long userId,
+                                 @Param("since") LocalDateTime since);
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE " +
+            "(t.fromCard.user.id = :userId OR t.toCard.user.id = :userId) AND " +
+            "t.transactionDate >= :since")
+    BigDecimal sumAmountByUserInLast30Days(@Param("userId") Long userId,
+                                           @Param("since") LocalDateTime since);
+
+    @Query("SELECT t FROM Transaction t WHERE " +
+            "(t.fromCard.user.id = :userId OR t.toCard.user.id = :userId) " +
+            "ORDER BY t.transactionDate DESC")
+    List<Transaction> findRecentTransactionsByUser(@Param("userId") Long userId);
+}
+
+package com.bank.repository;
+
+import com.bank.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+    Boolean existsByUsername(String username);
+    Boolean existsByEmail(String email);
+}
+
+package com.bank.security;
+
+import com.bank.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        var user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.getUsername())
+                .password(user.getPassword())
+                .authorities(user.getRole().name())
+                .build();
+    }
+}
+
+package com.bank.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+@Component
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+    @Override
+    public void commence(HttpServletRequest request,
+                         HttpServletResponse response,
+                         AuthenticationException authException) throws IOException {
+
+        response.setContentType("application/json");
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", HttpServletResponse.SC_UNAUTHORIZED);
+        body.put("error", "Unauthorized");
+        body.put("message", "Authentication failed");
+        body.put("path", request.getServletPath());
+
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writeValue(response.getOutputStream(), body);
+    }
+}
+
+package com.bank.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtTokenProvider tokenProvider;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        try {
+            String jwt = getJwtFromRequest(request);
+
+            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                String username = tokenProvider.getUsernameFromJWT(jwt);
+
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                var authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception ex) {
+            logger.error("Could not set user authentication in security context", ex);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+}
+
+package com.bank.security;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+import java.util.stream.Collectors;
+
+@Component
+@Slf4j
+public class JwtTokenProvider {
+
+    private final SecretKey signingKey;
+    private final long jwtExpirationInMs;
+
+    public JwtTokenProvider(@Value("${jwt.secret:bank-rest-secret-key-2024-very-secure-and-long}") String jwtSecret,
+                            @Value("${jwt.expiration:86400000}") long jwtExpirationInMs) {
+        this.jwtExpirationInMs = jwtExpirationInMs;
+        this.signingKey = getSigningKey(jwtSecret);
+    }
+
+    private SecretKey getSigningKey(String jwtSecret) {
+        byte[] keyBytes;
+        if (jwtSecret.length() < 32) {
+            StringBuilder sb = new StringBuilder(jwtSecret);
+            while (sb.length() < 32) {
+                sb.append("0");
+            }
+            keyBytes = sb.substring(0, 32).getBytes();
+        } else if (jwtSecret.length() > 32) {
+            keyBytes = jwtSecret.substring(0, 32).getBytes();
+        } else {
+            keyBytes = jwtSecret.getBytes();
+        }
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public String generateToken(Authentication authentication) {
+        String username = authentication.getName();
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
+
+        return Jwts.builder()
+                .setSubject(username)
+                .claim("authorities", authorities)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String getUsernameFromJWT(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.getSubject();
+    }
+
+    public boolean validateToken(String authToken) {
+        try {
+            Jwts.parserBuilder()
+                    .setSigningKey(signingKey)
+                    .build()
+                    .parseClaimsJws(authToken);
+            return true;
+        } catch (MalformedJwtException ex) {
+            log.error("Invalid JWT token");
+        } catch (ExpiredJwtException ex) {
+            log.error("Expired JWT token");
+        } catch (UnsupportedJwtException ex) {
+            log.error("Unsupported JWT token");
+        } catch (IllegalArgumentException ex) {
+            log.error("JWT claims string is empty");
+        } catch (Exception ex) {
+            log.error("JWT validation error: {}", ex.getMessage());
+        }
+        return false;
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.AuditLog;
+import com.bank.repository.AuditLogRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuditService {
+
+    private final AuditLogRepository auditLogRepository;
+
+    @Transactional
+    public void logActivity(String actionType, String description, boolean success,
+                            String resourceId, String requestDetails, HttpServletRequest request) {
+
+        String username = getCurrentUsername();
+        String ipAddress = getClientIp(request);
+        String userAgent = request != null ? request.getHeader("User-Agent") : null;
+
+        AuditLog auditLog = AuditLog.builder()
+                .actionType(actionType)
+                .description(description)
+                .username(username)
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .success(success)
+                .resourceId(resourceId)
+                .requestDetails(requestDetails)
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        try {
+            auditLogRepository.save(auditLog);
+            log.debug("Audit log saved: {} - {}", actionType, description);
+        } catch (Exception e) {
+            log.error("Failed to save audit log: {}", e.getMessage());
+        }
+    }
+
+    public void logSecurityEvent(String actionType, String description, boolean success,
+                                 HttpServletRequest request) {
+        logActivity(actionType, description, success, null, null, request);
+    }
+
+    public void logTransferActivity(Long fromCardId, Long toCardId, BigDecimal amount,
+                                    boolean success, String errorMessage, HttpServletRequest request) {
+        String description = String.format("Transfer %.2f from card %d to card %d",
+                amount, fromCardId, toCardId);
+        String requestDetails = String.format("{\"fromCardId\": %d, \"toCardId\": %d, \"amount\": %.2f}",
+                fromCardId, toCardId, amount);
+
+        logActivity("TRANSFER", description, success, fromCardId.toString(),
+                requestDetails, request);
+
+        if (!success && errorMessage != null) {
+            // Дополнительный лог для ошибок
+            logActivity("TRANSFER_ERROR", errorMessage, false, fromCardId.toString(),
+                    requestDetails, request);
+        }
+    }
+
+    private String getCurrentUsername() {
+        try {
+            return SecurityContextHolder.getContext().getAuthentication().getName();
+        } catch (Exception e) {
+            return "SYSTEM";
+        }
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        if (request == null) return "unknown";
+
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader != null) {
+            return xfHeader.split(",")[0];
+        }
+        return request.getRemoteAddr();
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.User;
+import com.bank.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+        return user;
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.Card;
+import com.bank.entity.Transaction;
+import com.bank.entity.User;
+import com.bank.event.CardBlockRequestedEvent;
+import com.bank.event.TransferCompletedEvent;
+import com.bank.exception.*;
+import com.bank.repository.CardRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CardService {
+
+    private final CardRepository cardRepository;
+    private final EncryptionService encryptionService;
+    private final TransactionService transactionService;
+    private final MonitoringService monitoringService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final AuditService auditService;
+
+    public Page<Card> getUserCards(User user, Pageable pageable, String search) {
+        log.debug("Getting cards for user: id={}, username={}", user.getId(), user.getUsername());
+
+        if (search != null && !search.trim().isEmpty()) {
+            return cardRepository.findByUserAndCardHolderContainingIgnoreCase(user, search.trim(), pageable);
+        }
+
+        return cardRepository.findByUser(user, pageable);
+    }
+
+    public List<Card> getUserActiveCards(User user) {
+        return cardRepository.findActiveUserCards(user);
+    }
+
+    public Card getCardById(Long cardId, User user) {
+        log.debug("Getting card {} for user: id={}, username={}", cardId, user.getId(), user.getUsername());
+
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new CardNotFoundException("Card not found with id: " + cardId));
+
+        // Проверяем, что пользователь является владельцем карты или администратором
+        boolean isOwner = card.getUser().getId().equals(user.getId());
+        boolean isAdmin = user.getRole().equals(User.Role.ROLE_ADMIN);
+
+        log.debug("Card user id: {}, current user id: {}, isOwner: {}, isAdmin: {}",
+                card.getUser().getId(), user.getId(), isOwner, isAdmin);
+
+        if (!isOwner && !isAdmin) {
+            throw new UnauthorizedAccessException("Access denied to card");
+        }
+
+        return card;
+    }
+
+    public Page<Card> getAllCards(Pageable pageable) {
+        return cardRepository.findAll(pageable);
+    }
+
+    @Transactional
+    public void deleteCard(Long cardId) {
+        if (!cardRepository.existsById(cardId)) {
+            throw new CardNotFoundException("Card not found with id: " + cardId);
+        }
+        cardRepository.deleteById(cardId);
+        log.info("Card deleted successfully: {}", cardId);
+    }
+
+    @Transactional
+    public Card createCard(Card card) {
+        // Проверка на дубликат карты
+        if (cardRepository.existsByCardNumber(card.getCardNumber())) {
+            throw new CardAlreadyExistsException("Card with this number already exists");
+        }
+
+        // Устанавливаем начальный баланс
+        if (card.getBalance() == null) {
+            card.setBalance(BigDecimal.ZERO);
+        }
+
+        // Проверяем срок действия
+        if (card.getExpiryDate().isBefore(LocalDate.now())) {
+            card.setStatus(Card.CardStatus.EXPIRED);
+        } else {
+            card.setStatus(Card.CardStatus.ACTIVE);
+        }
+
+        Card savedCard = cardRepository.save(card);
+        log.info("Card created successfully: {} for user {}", savedCard.getId(),
+                card.getUser().getUsername());
+
+        // Логируем создание карты
+        auditService.logActivity("CARD_CREATE",
+                String.format("Card created: %s for user %s", savedCard.getId(), card.getUser().getUsername()),
+                true, savedCard.getId().toString(), null, null);
+
+        return savedCard;
+    }
+
+    @Transactional
+    public Card updateCardStatus(Long cardId, Card.CardStatus status) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new CardNotFoundException("Card not found with id: " + cardId));
+
+        card.setStatus(status);
+        Card updatedCard = cardRepository.save(card);
+
+        // Логируем изменение статуса
+        auditService.logActivity("CARD_STATUS_UPDATE",
+                String.format("Card status updated to %s", status),
+                true, cardId.toString(), null, null);
+
+        log.info("Card status updated: {} -> {}", cardId, status);
+        return updatedCard;
+    }
+
+    @Transactional
+    public void requestCardBlock(Long cardId, User user) {
+        Card card = getCardById(cardId, user);
+        card.setBlockRequested(true);
+        cardRepository.save(card);
+
+        // Публикуем событие запроса блокировки
+        eventPublisher.publishEvent(new CardBlockRequestedEvent(this, card, "User requested block"));
+
+        monitoringService.recordCardBlockRequest(cardId, user.getUsername());
+
+        // Логируем запрос блокировки
+        auditService.logActivity("CARD_BLOCK_REQUEST",
+                String.format("Block requested for card %s", cardId),
+                true, cardId.toString(), null, null);
+
+        log.info("Block requested for card: {} by user: {}", cardId, user.getUsername());
+    }
+
+    public List<Card> getCardsWithBlockRequests() {
+        return cardRepository.findByBlockRequestedTrue();
+    }
+
+    @Transactional
+    public void transferBetweenCards(User user, Long fromCardId, Long toCardId, BigDecimal amount) {
+        long startTime = System.currentTimeMillis();
+
+        try {
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Transfer amount must be positive");
+            }
+
+            if (fromCardId.equals(toCardId)) {
+                throw new IllegalArgumentException("Cannot transfer to the same card");
+            }
+
+            Card fromCard = getCardById(fromCardId, user);
+            Card toCard = getCardById(toCardId, user);
+
+            // Проверяем, что обе карты принадлежат пользователю
+            if (!fromCard.getUser().getId().equals(user.getId()) ||
+                    !toCard.getUser().getId().equals(user.getId())) {
+                throw new UnauthorizedAccessException("You can only transfer between your own cards");
+            }
+
+            if (!fromCard.isActive()) {
+                throw new IllegalStateException("Source card is not active");
+            }
+
+            if (!toCard.isActive()) {
+                throw new IllegalStateException("Destination card is not active");
+            }
+
+            if (fromCard.getBalance().compareTo(amount) < 0) {
+                throw new InsufficientBalanceException("Insufficient balance for transfer");
+            }
+
+            // Выполняем перевод
+            fromCard.setBalance(fromCard.getBalance().subtract(amount));
+            toCard.setBalance(toCard.getBalance().add(amount));
+
+            cardRepository.save(fromCard);
+            cardRepository.save(toCard);
+
+            // Создаем запись о транзакции
+            Transaction transaction = Transaction.builder()
+                    .fromCard(fromCard)
+                    .toCard(toCard)
+                    .amount(amount)
+                    .status(Transaction.TransactionStatus.SUCCESS)
+                    .build();
+
+            Transaction savedTransaction = transactionService.saveTransaction(transaction);
+
+            // Публикуем событие успешного перевода
+            eventPublisher.publishEvent(new TransferCompletedEvent(this, savedTransaction, fromCard, toCard, amount));
+
+            long duration = System.currentTimeMillis() - startTime;
+            monitoringService.recordTransfer(user.getUsername(), toCard.getUser().getUsername(), amount);
+
+            // Логируем успешный перевод
+            auditService.logActivity("TRANSFER_SUCCESS",
+                    String.format("Transfer %.2f from card %s to card %s", amount, fromCardId, toCardId),
+                    true, fromCardId.toString(),
+                    String.format("{\"fromCardId\": %d, \"toCardId\": %d, \"amount\": %.2f}", fromCardId, toCardId, amount),
+                    null);
+
+            log.info("Transfer completed: {} from card {} to card {} ({} ms)",
+                    amount, fromCardId, toCardId, duration);
+
+        } catch (Exception e) {
+            long duration = System.currentTimeMillis() - startTime;
+
+            // Логируем неудачный перевод
+            auditService.logActivity("TRANSFER_FAILED",
+                    String.format("Transfer failed: %.2f from card %s to card %s - %s", amount, fromCardId, toCardId, e.getMessage()),
+                    false, fromCardId.toString(),
+                    String.format("{\"fromCardId\": %d, \"toCardId\": %d, \"amount\": %.2f}", fromCardId, toCardId, amount),
+                    null);
+
+            log.error("Transfer failed: {} from card {} to card {} ({} ms) - Error: {}",
+                    amount, fromCardId, toCardId, duration, e.getMessage());
+            throw e;
+        }
+    }
+
+    public String getMaskedCardNumber(String encryptedCardNumber) {
+        try {
+            String decrypted = encryptionService.decrypt(encryptedCardNumber);
+            if (decrypted != null && decrypted.length() >= 4) {
+                return "**** **** **** " + decrypted.substring(decrypted.length() - 4);
+            }
+            return "**** **** **** ****";
+        } catch (Exception e) {
+            log.warn("Error decrypting card number for masking: {}", e.getMessage());
+            return "**** **** **** ****";
+        }
+    }
+
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void checkAndUpdateExpiredCards() {
+        List<Card> expiredCards = cardRepository.findByStatusAndExpiryDateBefore(
+                Card.CardStatus.ACTIVE, LocalDate.now());
+
+        for (Card card : expiredCards) {
+            card.setStatus(Card.CardStatus.EXPIRED);
+            log.info("Card {} expired and was deactivated", card.getId());
+
+            // Логируем автоматическое истечение срока
+            auditService.logActivity("CARD_EXPIRED_AUTO",
+                    String.format("Card %s expired automatically", card.getId()),
+                    true, card.getId().toString(), null, null);
+        }
+
+        if (!expiredCards.isEmpty()) {
+            cardRepository.saveAll(expiredCards);
+        }
+    }
+
+    public boolean isCardOwnedByUser(Long cardId, User user) {
+        return cardRepository.findByIdAndUser(cardId, user).isPresent();
+    }
+}
+
+package com.bank.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+
+@Service
+public class EncryptionService {
+
+    private final String encryptionKey;
+    private final SecretKeySpec secretKey;
+
+    public EncryptionService(@Value("${app.encryption.key:bank-encryption-key-32-chars-long!}") String encryptionKey) {
+        this.encryptionKey = encryptionKey;
+        this.secretKey = getSecretKey();
+    }
+
+    private static final String ALGORITHM = "AES";
+    private static final String TRANSFORMATION = "AES/ECB/PKCS5Padding";
+
+    private SecretKeySpec getSecretKey() {
+        byte[] keyBytes = new byte[32];
+        byte[] originalBytes = encryptionKey.getBytes();
+        System.arraycopy(originalBytes, 0, keyBytes, 0, Math.min(originalBytes.length, keyBytes.length));
+        return new SecretKeySpec(keyBytes, ALGORITHM);
+    }
+
+    public String encrypt(String data) {
+        try {
+            if (data == null) return null;
+
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+            byte[] encryptedBytes = cipher.doFinal(data.getBytes());
+            return Base64.getEncoder().encodeToString(encryptedBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("Error encrypting data", e);
+        }
+    }
+
+    public String decrypt(String encryptedData) {
+        try {
+            if (encryptedData == null) return null;
+
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
+            byte[] decodedBytes = Base64.getDecoder().decode(encryptedData);
+            byte[] decryptedBytes = cipher.doFinal(decodedBytes);
+            return new String(decryptedBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("Error decrypting data", e);
+        }
+    }
+}
+
+package com.bank.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+@Slf4j
+@Service
+public class MonitoringService {
+
+    private final ConcurrentHashMap<String, AtomicLong> metrics = new ConcurrentHashMap<>();
+
+    public MonitoringService() {
+        // Инициализация метрик
+        metrics.put("login.success", new AtomicLong(0));
+        metrics.put("login.failure", new AtomicLong(0));
+        metrics.put("transfer.completed", new AtomicLong(0));
+        metrics.put("card.block.requests", new AtomicLong(0));
+        metrics.put("api.requests", new AtomicLong(0));
+    }
+
+    public void recordSuccessfulLogin(String username) {
+        metrics.get("login.success").incrementAndGet();
+        log.info("✅ Successful login for user: {}", username);
+    }
+
+    public void recordFailedLogin(String username) {
+        metrics.get("login.failure").incrementAndGet();
+        log.warn("❌ Failed login attempt for user: {}", username);
+    }
+
+    public void recordTransfer(String fromUser, String toUser, BigDecimal amount) {
+        metrics.get("transfer.completed").incrementAndGet();
+        log.info("💰 Transfer completed: {} from {} to {}", amount, fromUser, toUser);
+    }
+
+    public void recordCardBlockRequest(Long cardId, String username) {
+        metrics.get("card.block.requests").incrementAndGet();
+        log.info("🚫 Card block requested: card {} by user {}", cardId, username);
+    }
+
+    public void recordApiRequest() {
+        metrics.get("api.requests").incrementAndGet();
+    }
+
+    public long getMetric(String metricName) {
+        AtomicLong metric = metrics.get(metricName);
+        return metric != null ? metric.get() : 0;
+    }
+
+    public ConcurrentHashMap<String, AtomicLong> getAllMetrics() {
+        return new ConcurrentHashMap<>(metrics);
+    }
+
+    public void recordSystemHealth() {
+        long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        long maxMemory = Runtime.getRuntime().maxMemory();
+        double memoryUsage = (double) usedMemory / maxMemory * 100;
+
+        log.debug("💾 Memory usage: {}/{} MB ({:.2f}%)",
+                usedMemory / (1024 * 1024),
+                maxMemory / (1024 * 1024),
+                memoryUsage);
+    }
+}
+
+package com.bank.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.regex.Pattern;
+
+@Slf4j
+@Service
+public class PasswordPolicyService {
+
+    private static final int MIN_PASSWORD_LENGTH = 8;
+    private static final int MAX_PASSWORD_LENGTH = 128;
+    private static final Pattern UPPERCASE_PATTERN = Pattern.compile("[A-Z]");
+    private static final Pattern LOWERCASE_PATTERN = Pattern.compile("[a-z]");
+    private static final Pattern DIGIT_PATTERN = Pattern.compile("[0-9]");
+    private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile("[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]");
+
+    public boolean validatePassword(String password) {
+        if (password == null) {
+            log.warn("Password is null");
+            return false;
+        }
+
+        if (password.length() < MIN_PASSWORD_LENGTH || password.length() > MAX_PASSWORD_LENGTH) {
+            log.warn("Password length invalid: {} (must be between {} and {})",
+                    password.length(), MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH);
+            return false;
+        }
+
+        boolean hasUppercase = UPPERCASE_PATTERN.matcher(password).find();
+        boolean hasLowercase = LOWERCASE_PATTERN.matcher(password).find();
+        boolean hasDigit = DIGIT_PATTERN.matcher(password).find();
+        boolean hasSpecialChar = SPECIAL_CHAR_PATTERN.matcher(password).find();
+
+        log.debug("Password validation - Uppercase: {}, Lowercase: {}, Digit: {}, Special: {}",
+                hasUppercase, hasLowercase, hasDigit, hasSpecialChar);
+
+        if (!hasUppercase) {
+            log.warn("Password must contain at least one uppercase letter");
+            return false;
+        }
+
+        int additionalRequirementsMet = 0;
+        if (hasLowercase) additionalRequirementsMet++;
+        if (hasDigit) additionalRequirementsMet++;
+        if (hasSpecialChar) additionalRequirementsMet++;
+
+        boolean isValid = additionalRequirementsMet >= 2;
+
+        if (!isValid) {
+            log.warn("Password complexity requirements not met. Required: uppercase + 2 additional categories, Actual additional: {}", additionalRequirementsMet);
+        }
+
+        return isValid;
+    }
+
+    public String generatePasswordRequirementsMessage() {
+        return String.format(
+                "Password must be between %d and %d characters long and contain: at least one uppercase letter, and at least two of the following: lowercase letters, numbers, special characters",
+                MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH
+        );
+    }
+}
+
+package com.bank.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class RateLimitService {
+
+    private final CacheManager cacheManager;
+
+    private static final int MAX_REQUESTS_PER_MINUTE = 100;
+    private static final int MAX_LOGIN_ATTEMPTS_PER_HOUR = 5;
+    private static final int MAX_TRANSFERS_PER_DAY = 10;
+
+    public boolean isRateLimited(String key, RateLimitType type) {
+        String cacheKey = type + "_" + key;
+        Cache cache = cacheManager.getCache("rateLimit");
+
+        if (cache == null) {
+            return false;
+        }
+
+        RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);
+        if (rateLimitInfo == null) {
+            rateLimitInfo = new RateLimitInfo();
+            cache.put(cacheKey, rateLimitInfo);
+        }
+
+        return rateLimitInfo.isRateLimited(type);
+    }
+
+    public void recordRequest(String key, RateLimitType type) {
+        String cacheKey = type + "_" + key;
+        Cache cache = cacheManager.getCache("rateLimit");
+
+        if (cache == null) {
+            return;
+        }
+
+        RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);
+        if (rateLimitInfo == null) {
+            rateLimitInfo = new RateLimitInfo();
+        }
+
+        rateLimitInfo.recordRequest(type);
+        cache.put(cacheKey, rateLimitInfo);
+    }
+
+    public enum RateLimitType {
+        API_REQUEST,
+        LOGIN_ATTEMPT,
+        TRANSFER_OPERATION
+    }
+
+    private static class RateLimitInfo {
+        private final AtomicInteger requestsLastMinute = new AtomicInteger(0);
+        private final AtomicInteger loginAttemptsLastHour = new AtomicInteger(0);
+        private final AtomicInteger transfersLastDay = new AtomicInteger(0);
+        private LocalDateTime minuteWindowStart = LocalDateTime.now();
+        private LocalDateTime hourWindowStart = LocalDateTime.now();
+        private LocalDateTime dayWindowStart = LocalDateTime.now();
+
+        public synchronized boolean isRateLimited(RateLimitType type) {
+            resetCountersIfNeeded();
+
+            switch (type) {
+                case API_REQUEST:
+                    return requestsLastMinute.get() >= MAX_REQUESTS_PER_MINUTE;
+                case LOGIN_ATTEMPT:
+                    return loginAttemptsLastHour.get() >= MAX_LOGIN_ATTEMPTS_PER_HOUR;
+                case TRANSFER_OPERATION:
+                    return transfersLastDay.get() >= MAX_TRANSFERS_PER_DAY;
+                default:
+                    return false;
+            }
+        }
+
+        public synchronized void recordRequest(RateLimitType type) {
+            resetCountersIfNeeded();
+
+            switch (type) {
+                case API_REQUEST:
+                    requestsLastMinute.incrementAndGet();
+                    break;
+                case LOGIN_ATTEMPT:
+                    loginAttemptsLastHour.incrementAndGet();
+                    break;
+                case TRANSFER_OPERATION:
+                    transfersLastDay.incrementAndGet();
+                    break;
+            }
+        }
+
+        private void resetCountersIfNeeded() {
+            LocalDateTime now = LocalDateTime.now();
+
+            if (now.minusMinutes(1).isAfter(minuteWindowStart)) {
+                requestsLastMinute.set(0);
+                minuteWindowStart = now;
+            }
+
+            if (now.minusHours(1).isAfter(hourWindowStart)) {
+                loginAttemptsLastHour.set(0);
+                hourWindowStart = now;
+            }
+
+            if (now.minusDays(1).isAfter(dayWindowStart)) {
+                transfersLastDay.set(0);
+                dayWindowStart = now;
+            }
+        }
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.Transaction;
+import com.bank.repository.TransactionRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class TransactionReportService {
+
+    private final TransactionRepository transactionRepository;
+
+    public Map<String, Object> getDailyTransactionReport() {
+        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+        LocalDateTime endOfDay = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
+
+        long totalTransactions = transactionRepository.countByTransactionDateBetween(startOfDay, endOfDay);
+        BigDecimal totalAmount = transactionRepository.sumAmountByTransactionDateBetween(startOfDay, endOfDay);
+        long successfulTransactions = transactionRepository.countByStatusAndTransactionDateBetween(
+                Transaction.TransactionStatus.SUCCESS, startOfDay, endOfDay);
+
+        Map<String, Object> report = new HashMap<>();
+        report.put("date", LocalDateTime.now().toLocalDate());
+        report.put("totalTransactions", totalTransactions);
+        report.put("successfulTransactions", successfulTransactions);
+        report.put("failedTransactions", totalTransactions - successfulTransactions);
+        report.put("totalAmount", totalAmount != null ? totalAmount : BigDecimal.ZERO);
+        report.put("successRate", totalTransactions > 0 ?
+                BigDecimal.valueOf((double) successfulTransactions / totalTransactions * 100)
+                        .setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO);
+
+        return report;
+    }
+
+    public Map<String, Object> getUserTransactionStats(Long userId) {
+        LocalDateTime last30Days = LocalDateTime.now().minusDays(30);
+
+        long userTransactions = transactionRepository.countByUserInLast30Days(userId, last30Days);
+        BigDecimal userTotalAmount = transactionRepository.sumAmountByUserInLast30Days(userId, last30Days);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("userId", userId);
+        stats.put("period", "LAST_30_DAYS");
+        stats.put("totalTransactions", userTransactions);
+        stats.put("totalAmount", userTotalAmount != null ? userTotalAmount : BigDecimal.ZERO);
+        stats.put("averageAmount", userTransactions > 0 ?
+                userTotalAmount.divide(BigDecimal.valueOf(userTransactions), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO);
+
+        return stats;
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.Transaction;
+import com.bank.repository.TransactionRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class TransactionService {
+
+    private final TransactionRepository transactionRepository;
+
+    public Transaction saveTransaction(Transaction transaction) {
+        return transactionRepository.save(transaction);
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.User;
+import com.bank.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public User getUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
+    }
+
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+    }
+
+    public Page<User> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable);
+    }
+
+    public boolean userExists(Long userId) {
+        return userRepository.existsById(userId);
+    }
+}
+
+package com.bank.validation;
+
+import jakarta.validation.Constraint;
+import jakarta.validation.Payload;
+import java.lang.annotation.*;
+
+@Documented
+@Constraint(validatedBy = StrongPasswordValidator.class)
+@Target({ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface StrongPassword {
+    String message() default "Password does not meet security requirements";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+package com.bank.validation;
+
+import com.bank.service.PasswordPolicyService;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class StrongPasswordValidator implements ConstraintValidator<StrongPassword, String> {
+
+    private final PasswordPolicyService passwordPolicyService;
+
+    @Override
+    public boolean isValid(String password, ConstraintValidatorContext context) {
+        if (password == null) {
+            return false;
+        }
+        return passwordPolicyService.validatePassword(password);
+    }
+
+    @Override
+    public void initialize(StrongPassword constraintAnnotation) {
+        // Инициализация не требуется
+    }
+}
+
+package com.bank;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BankApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BankApplication.class, args);
+    }
+}
+
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="001-create-users-table" author="bank">
+        <createTable tableName="users">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="VARCHAR(50)">
+                <constraints unique="true" nullable="false"/>
+            </column>
+            <column name="password" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email" type="VARCHAR(100)">
+                <constraints unique="true" nullable="false"/>
+            </column>
+            <column name="role" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="users" indexName="idx_users_username">
+            <column name="username"/>
+        </createIndex>
+
+        <createIndex tableName="users" indexName="idx_users_email">
+            <column name="email"/>
+        </createIndex>
+
+        <createIndex tableName="users" indexName="idx_users_role">
+            <column name="role"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="001-insert-test-users" author="bank">
+        <insert tableName="users">
+            <column name="username" value="admin"/>
+            <column name="password" value="$2a$10$ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQ"/>
+            <column name="email" value="admin@bank.com"/>
+            <column name="role" value="ROLE_ADMIN"/>
+        </insert>
+
+        <insert tableName="users">
+            <column name="username" value="user1"/>
+            <column name="password" value="$2a$10$ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQ"/>
+            <column name="email" value="user1@bank.com"/>
+            <column name="role" value="ROLE_USER"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="002-create-cards-table" author="bank">
+        <createTable tableName="cards">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="card_number" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="card_holder" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expiry_date" type="DATE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="balance" type="DECIMAL(15,2)" defaultValue="0.00">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_cards_user_id" references="users(id)"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="block_requested" type="BOOLEAN" defaultValue="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="cards" indexName="idx_cards_user_id">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex tableName="cards" indexName="idx_cards_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="cards" indexName="idx_cards_expiry_date">
+            <column name="expiry_date"/>
+        </createIndex>
+
+        <createIndex tableName="cards" indexName="idx_cards_block_requested">
+            <column name="block_requested"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-insert-test-cards" author="bank">
+        <insert tableName="cards">
+            <column name="card_number" value="encrypted_admin_card_1234"/>
+            <column name="card_holder" value="ADMIN USER"/>
+            <column name="expiry_date" valueDate="2026-12-31"/>
+            <column name="balance" valueNumeric="10000.00"/>
+            <column name="status" value="ACTIVE"/>
+            <column name="user_id" valueNumeric="1"/>
+            <column name="block_requested" valueBoolean="false"/>
+        </insert>
+
+        <insert tableName="cards">
+            <column name="card_number" value="encrypted_user1_card_5678"/>
+            <column name="card_holder" value="USER ONE"/>
+            <column name="expiry_date" valueDate="2025-06-30"/>
+            <column name="balance" valueNumeric="5000.00"/>
+            <column name="status" value="ACTIVE"/>
+            <column name="user_id" valueNumeric="2"/>
+            <column name="block_requested" valueBoolean="false"/>
+        </insert>
+
+        <insert tableName="cards">
+            <column name="card_number" value="encrypted_user1_card_9012"/>
+            <column name="card_holder" value="USER ONE"/>
+            <column name="expiry_date" valueDate="2025-12-31"/>
+            <column name="balance" valueNumeric="2500.00"/>
+            <column name="status" value="ACTIVE"/>
+            <column name="user_id" valueNumeric="2"/>
+            <column name="block_requested" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="003-create-transactions-table" author="bank">
+        <createTable tableName="transactions">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="from_card_id" type="BIGINT">
+                <constraints nullable="true" foreignKeyName="fk_transactions_from_card" references="cards(id)"/>
+            </column>
+            <column name="to_card_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_transactions_to_card" references="cards(id)"/>
+            </column>
+            <column name="amount" type="DECIMAL(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transaction_date" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="transactions" indexName="idx_transactions_from_card">
+            <column name="from_card_id"/>
+        </createIndex>
+
+        <createIndex tableName="transactions" indexName="idx_transactions_to_card">
+            <column name="to_card_id"/>
+        </createIndex>
+
+        <createIndex tableName="transactions" indexName="idx_transactions_date">
+            <column name="transaction_date"/>
+        </createIndex>
+
+        <createIndex tableName="transactions" indexName="idx_transactions_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="transactions" indexName="idx_transactions_amount">
+            <column name="amount"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="003-insert-sample-transactions" author="bank">
+        <insert tableName="transactions">
+            <column name="from_card_id" valueNumeric="2"/>
+            <column name="to_card_id" valueNumeric="3"/>
+            <column name="amount" valueNumeric="500.00"/>
+            <column name="transaction_date" valueDate="2024-01-15 10:30:00"/>
+            <column name="status" value="SUCCESS"/>
+        </insert>
+
+        <insert tableName="transactions">
+            <column name="from_card_id" valueNumeric="1"/>
+            <column name="to_card_id" valueNumeric="2"/>
+            <column name="amount" valueNumeric="1000.00"/>
+            <column name="transaction_date" valueDate="2024-01-16 14:45:00"/>
+            <column name="status" value="SUCCESS"/>
+        </insert>
+
+        <insert tableName="transactions">
+            <column name="from_card_id" valueNumeric="3"/>
+            <column name="to_card_id" valueNumeric="1"/>
+            <column name="amount" valueNumeric="250.00"/>
+            <column name="transaction_date" valueDate="2024-01-17 09:15:00"/>
+            <column name="status" value="SUCCESS"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="004-create-audit-logs-table" author="bank">
+        <createTable tableName="audit_logs">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="action_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="VARCHAR(500)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="username" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ip_address" type="VARCHAR(45)"/>
+            <column name="user_agent" type="VARCHAR(500)"/>
+            <column name="success" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="error_message" type="VARCHAR(1000)"/>
+            <column name="timestamp" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="resource_id" type="VARCHAR(50)"/>
+            <column name="request_details" type="VARCHAR(1000)"/>
+        </createTable>
+
+        <createIndex tableName="audit_logs" indexName="idx_audit_username">
+            <column name="username"/>
+        </createIndex>
+
+        <createIndex tableName="audit_logs" indexName="idx_audit_action_type">
+            <column name="action_type"/>
+        </createIndex>
+
+        <createIndex tableName="audit_logs" indexName="idx_audit_timestamp">
+            <column name="timestamp"/>
+        </createIndex>
+
+        <createIndex tableName="audit_logs" indexName="idx_audit_success">
+            <column name="success"/>
+        </createIndex>
+
+        <createIndex tableName="audit_logs" indexName="idx_audit_ip_address">
+            <column name="ip_address"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="004-insert-sample-audit-logs" author="bank">
+        <insert tableName="audit_logs">
+            <column name="action_type" value="LOGIN_SUCCESS"/>
+            <column name="description" value="User authenticated successfully"/>
+            <column name="username" value="admin"/>
+            <column name="ip_address" value="192.168.1.100"/>
+            <column name="user_agent" value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"/>
+            <column name="success" valueBoolean="true"/>
+            <column name="timestamp" valueDate="2024-01-15 08:30:00"/>
+        </insert>
+
+        <insert tableName="audit_logs">
+            <column name="action_type" value="TRANSFER_SUCCESS"/>
+            <column name="description" value="Transfer 500.00 from card 2 to card 3"/>
+            <column name="username" value="user1"/>
+            <column name="ip_address" value="192.168.1.101"/>
+            <column name="success" valueBoolean="true"/>
+            <column name="resource_id" value="2"/>
+            <column name="request_details" value="{&quot;fromCardId&quot;: 2, &quot;toCardId&quot;: 3, &quot;amount&quot;: 500.00}"/>
+            <column name="timestamp" valueDate="2024-01-15 10:30:00"/>
+        </insert>
+
+        <insert tableName="audit_logs">
+            <column name="action_type" value="LOGIN_FAILED"/>
+            <column name="description" value="Invalid credentials"/>
+            <column name="username" value="unknown_user"/>
+            <column name="ip_address" value="192.168.1.102"/>
+            <column name="success" valueBoolean="false"/>
+            <column name="error_message" value="Bad credentials"/>
+            <column name="timestamp" valueDate="2024-01-15 11:45:00"/>
+        </insert>
+
+        <insert tableName="audit_logs">
+            <column name="action_type" value="CARD_BLOCK_REQUEST"/>
+            <column name="description" value="Block requested for card 2"/>
+            <column name="username" value="user1"/>
+            <column name="ip_address" value="192.168.1.101"/>
+            <column name="success" valueBoolean="true"/>
+            <column name="resource_id" value="2"/>
+            <column name="timestamp" valueDate="2024-01-16 16:20:00"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <include file="db/changelog/migration/001-create-users-table.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/migration/002-create-cards-table.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/migration/003-create-transactions-table.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/migration/004-create-audit-logs-table.xml" relativeToChangelogFile="true"/>
+</databaseChangeLog>
+
+spring:
+  application:
+    name: bank-rest
+  profiles:
+    active: local
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    drop-first: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:bankdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+jwt:
+  secret: local-development-jwt-secret-key-32-chars-minimum-required
+  expiration: 86400000
+
+app:
+  encryption:
+    key: local-encryption-key-32-chars-for-aes-256
+
+logging:
+  config: classpath:logback-spring.xml
+  level:
+    com.bank: DEBUG
+
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:bankdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop  # Используем create-drop для полной пересоздания таблиц
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: never
+  liquibase:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+jwt:
+  secret: local-secret-key-for-development
+  expiration: 86400000
+
+app:
+  encryption:
+    key: local-encryption-key-32-chars-long!
+
+spring:
+  main:
+    banner-mode: off
+    allow-bean-definition-overriding: true
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+  h2:
+    console:
+      enabled: false
+  liquibase:
+    enabled: false
+  security:
+    user:
+      name: testuser
+      password: testpass
+
+jwt:
+  secret: test-jwt-secret-key-very-long-for-testing-1234567890
+  expiration: 3600000
+
+app:
+  encryption:
+    key: test-encryption-key-32-chars-long-1234567890
+
+logging:
+  config: classpath:logback-spring.xml
+  level:
+    root: WARN
+    com.bank: DEBUG
+    org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      enabled: false
+
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <property name="LOG_FILE" value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}/}spring.log}"/>
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+        <file>${LOG_FILE}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Application specific logging -->
+    <logger name="com.bank" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- Spring Framework logging -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.springframework.security" level="WARN"/>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+    <!-- Test profile - minimal logging -->
+    <springProfile name="test">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.bank" level="WARN"/>
+    </springProfile>
+
+    <!-- Local profile - debug logging -->
+    <springProfile name="local">
+        <logger name="com.bank" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+    </springProfile>
+</configuration>
+
+package com.bank.config;
+
+import com.bank.service.RateLimitService;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.context.annotation.Bean;
+
+@TestConfiguration
+public class TestConfig {
+
+    @Bean
+    public CacheManager cacheManager() {
+        return new ConcurrentMapCacheManager("rateLimit");
+    }
+
+    @Bean
+    public RateLimitService rateLimitService() {
+        return new RateLimitService(cacheManager());
+    }
+}
+package com.bank.config;
+
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
+
+@TestConfiguration
+@EnableWebSecurity
+public class TestSecurityConfig {
+
+    @Bean
+    @Primary
+    public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(authz -> authz
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/**").permitAll()
+                );
+        return http.build();
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.config.RateLimitConfig;
+import com.bank.config.TestSecurityConfig;
+import com.bank.dto.AuthRequest;
+import com.bank.security.JwtTokenProvider;
+import com.bank.service.AuditService;
+import com.bank.service.MonitoringService;
+import com.bank.service.PasswordPolicyService;
+import com.bank.service.RateLimitService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(controllers = AuthController.class)
+@ActiveProfiles("test")
+@Import({RateLimitConfig.class, TestSecurityConfig.class})
+class AuthControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private AuthenticationManager authenticationManager;
+
+    @MockBean
+    private JwtTokenProvider tokenProvider;
+
+    @MockBean
+    private MonitoringService monitoringService;
+
+    @MockBean
+    private AuditService auditService;
+
+    @MockBean
+    private RateLimitService rateLimitService;
+
+    @MockBean
+    private PasswordPolicyService passwordPolicyService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private AuthRequest validAuthRequest;
+    private AuthRequest invalidAuthRequest;
+    private Authentication authentication;
+
+    @BeforeEach
+    void setUp() {
+        // Setup test data
+        validAuthRequest = new AuthRequest();
+        validAuthRequest.setUsername("testuser");
+        validAuthRequest.setPassword("ValidPass123!");
+
+        invalidAuthRequest = new AuthRequest();
+        invalidAuthRequest.setUsername("testuser");
+        invalidAuthRequest.setPassword("wrongpassword");
+
+        // Setup mock authentication
+        authentication = Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("testuser");
+
+        // Setup audit service to do nothing
+        doNothing().when(auditService).logSecurityEvent(anyString(), anyString(), anyBoolean(), any());
+
+        // Setup rate limit service to allow requests
+        when(rateLimitService.isRateLimited(anyString(), any())).thenReturn(false);
+        doNothing().when(rateLimitService).recordRequest(anyString(), any());
+
+        // Setup password policy service to allow valid passwords
+        when(passwordPolicyService.validatePassword("ValidPass123!")).thenReturn(true);
+        when(passwordPolicyService.validatePassword("wrongpassword")).thenReturn(true);
+        when(passwordPolicyService.validatePassword("weak")).thenReturn(false);
+    }
+
+    @Test
+    void authenticateUser_ValidCredentials_ShouldReturnToken() throws Exception {
+        // Given
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(authentication);
+        when(tokenProvider.generateToken(authentication)).thenReturn("test-jwt-token");
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validAuthRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("test-jwt-token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+
+        // Verify interactions
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(tokenProvider).generateToken(authentication);
+        verify(monitoringService).recordSuccessfulLogin("testuser");
+        verify(auditService).logSecurityEvent(eq("LOGIN_SUCCESS"), anyString(), eq(true), any());
+        verify(passwordPolicyService).validatePassword("ValidPass123!");
+    }
+
+    @Test
+    void authenticateUser_InvalidCredentials_ShouldReturnUnauthorized() throws Exception {
+        // Given
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new BadCredentialsException("Invalid credentials"));
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidAuthRequest)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string("Invalid credentials"));
+
+        // Verify interactions
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(monitoringService).recordFailedLogin("testuser");
+        verify(auditService).logSecurityEvent(eq("LOGIN_FAILED"), anyString(), eq(false), any());
+        verify(tokenProvider, never()).generateToken(any());
+        verify(passwordPolicyService).validatePassword("wrongpassword");
+    }
+
+    @Test
+    void authenticateUser_RateLimited_ShouldReturnTooManyRequests() throws Exception {
+        // Given
+        when(rateLimitService.isRateLimited(anyString(), any())).thenReturn(true);
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validAuthRequest)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(content().string("Rate limit exceeded. Please try again later."));
+
+        // Verify no authentication attempts when rate limited
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        verify(passwordPolicyService, never()).validatePassword(any());
+    }
+
+    @Test
+    void validateToken_ValidToken_ShouldReturnOk() throws Exception {
+        // Given
+        when(tokenProvider.validateToken("valid-token")).thenReturn(true);
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/validate")
+                        .header("Authorization", "Bearer valid-token"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Token is valid"));
+
+        // Verify interactions
+        verify(tokenProvider).validateToken("valid-token");
+        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_SUCCESS"), anyString(), eq(true), any());
+    }
+
+    @Test
+    void validateToken_InvalidToken_ShouldReturnBadRequest() throws Exception {
+        // Given
+        when(tokenProvider.validateToken("invalid-token")).thenReturn(false);
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/validate")
+                        .header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid token"));
+
+        // Verify interactions
+        verify(tokenProvider).validateToken("invalid-token");
+        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_FAILED"), anyString(), eq(false), any());
+    }
+
+    @Test
+    void validateToken_MissingToken_ShouldReturnBadRequest() throws Exception {
+        // When & Then
+        mockMvc.perform(post("/api/auth/validate"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid token"));
+
+        // Verify no token validation when token is missing
+        verify(tokenProvider, never()).validateToken(any());
+        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_FAILED"), anyString(), eq(false), any());
+    }
+
+    @Test
+    void validateToken_MalformedToken_ShouldReturnBadRequest() throws Exception {
+        // When & Then
+        mockMvc.perform(post("/api/auth/validate")
+                        .header("Authorization", "InvalidFormat"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid token"));
+
+        // Verify no token validation when token format is invalid
+        verify(tokenProvider, never()).validateToken(any());
+        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_FAILED"), anyString(), eq(false), any());
+    }
+
+    @Test
+    void authenticateUser_EmptyUsername_ShouldReturnBadRequest() throws Exception {
+        // Given
+        AuthRequest emptyUsernameRequest = new AuthRequest();
+        emptyUsernameRequest.setUsername("");
+        emptyUsernameRequest.setPassword("ValidPass123!");
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(emptyUsernameRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Username is required")));
+
+        // Verify no authentication attempts for invalid request
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        // Password validation should NOT be called when username is empty
+        verify(passwordPolicyService, never()).validatePassword(any());
+    }
+
+    @Test
+    void authenticateUser_EmptyPassword_ShouldReturnBadRequest() throws Exception {
+        // Given
+        AuthRequest emptyPasswordRequest = new AuthRequest();
+        emptyPasswordRequest.setUsername("testuser");
+        emptyPasswordRequest.setPassword("");
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(emptyPasswordRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Password is required")));
+
+        // Verify no authentication attempts for invalid request
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        // Password validation should NOT be called when password is empty
+        verify(passwordPolicyService, never()).validatePassword(any());
+    }
+
+    @Test
+    void authenticateUser_NullRequest_ShouldReturnBadRequest() throws Exception {
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Username is required")));
+
+        // Verify no authentication attempts for invalid request
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        verify(passwordPolicyService, never()).validatePassword(any());
+    }
+
+    @Test
+    void authenticateUser_WeakPassword_ShouldReturnBadRequest() throws Exception {
+        // Given
+        AuthRequest weakPasswordRequest = new AuthRequest();
+        weakPasswordRequest.setUsername("testuser");
+        weakPasswordRequest.setPassword("weak");
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(weakPasswordRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Password does not meet security requirements")));
+
+        // Verify no authentication attempts for weak password
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        verify(passwordPolicyService).validatePassword("weak");
+    }
+
+    @Test
+    void authenticateUser_NullUsername_ShouldReturnBadRequest() throws Exception {
+        // Given
+        AuthRequest nullUsernameRequest = new AuthRequest();
+        nullUsernameRequest.setUsername(null);
+        nullUsernameRequest.setPassword("ValidPass123!");
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(nullUsernameRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Username is required")));
+
+        // Verify no interactions for null username
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        verify(passwordPolicyService, never()).validatePassword(any());
+    }
+
+    @Test
+    void authenticateUser_NullPassword_ShouldReturnBadRequest() throws Exception {
+        // Given
+        AuthRequest nullPasswordRequest = new AuthRequest();
+        nullPasswordRequest.setUsername("testuser");
+        nullPasswordRequest.setPassword(null);
+
+        // When & Then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(nullPasswordRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Password is required")));
+
+        // Verify no interactions for null password
+        verify(authenticationManager, never()).authenticate(any());
+        verify(tokenProvider, never()).generateToken(any());
+        verify(passwordPolicyService, never()).validatePassword(any());
+    }
+}
+
+package com.bank.controller;
+
+import com.bank.config.RateLimitConfig;
+import com.bank.config.TestSecurityConfig;
+import com.bank.dto.TransferRequest;
+import com.bank.service.CardService;
+import com.bank.service.RateLimitService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.math.BigDecimal;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(controllers = CardController.class)
+@ActiveProfiles("test")
+@Import({RateLimitConfig.class, TestSecurityConfig.class})
+class CardControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private CardService cardService;
+
+    @MockBean
+    private RateLimitService rateLimitService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @WithMockUser(username = "testuser")
+    void transferBetweenCards_ValidRequest_ShouldReturnSuccess() throws Exception {
+        // Given
+        TransferRequest transferRequest = new TransferRequest();
+        transferRequest.setFromCardId(1L);
+        transferRequest.setToCardId(2L);
+        transferRequest.setAmount(new BigDecimal("100.00"));
+
+        doNothing().when(cardService).transferBetweenCards(any(), eq(1L), eq(2L), any(BigDecimal.class));
+
+        // When & Then
+        mockMvc.perform(post("/api/cards/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(transferRequest)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Transfer completed successfully"));
+    }
+
+    @Test
+    @WithMockUser(username = "testuser")
+    void requestBlockCard_ShouldReturnSuccess() throws Exception {
+        // Given
+        doNothing().when(cardService).requestCardBlock(eq(1L), any());
+
+        // When & Then
+        mockMvc.perform(post("/api/cards/1/block-request"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Block request submitted for card: 1. Please contact administrator."));
+    }
+}
+
+package com.bank.entity;
+
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class CardTest {
+
+    @Test
+    void cardStatusChecks_ShouldWorkCorrectly() {
+        // Given
+        Card activeCard = Card.builder()
+                .status(Card.CardStatus.ACTIVE)
+                .expiryDate(LocalDate.now().plusDays(1))
+                .build();
+
+        Card expiredCard = Card.builder()
+                .status(Card.CardStatus.ACTIVE)
+                .expiryDate(LocalDate.now().minusDays(1))
+                .build();
+
+        Card blockedCard = Card.builder()
+                .status(Card.CardStatus.BLOCKED)
+                .expiryDate(LocalDate.now().plusDays(1))
+                .build();
+
+        // Then
+        assertTrue(activeCard.isActive());
+        assertFalse(expiredCard.isActive());
+        assertFalse(blockedCard.isActive());
+        assertTrue(expiredCard.isExpired());
+        assertTrue(blockedCard.isBlocked());
+    }
+
+    @Test
+    void cardBuilder_ShouldSetDefaultValues() {
+        // When
+        Card card = Card.builder()
+                .cardNumber("1234567890123456")
+                .cardHolder("TEST USER")
+                .expiryDate(LocalDate.now().plusYears(1))
+                .balance(new BigDecimal("1000.00"))
+                .status(Card.CardStatus.ACTIVE)
+                .build();
+
+        // Then
+        assertNotNull(card);
+        assertFalse(card.getBlockRequested());
+    }
+
+    @Test
+    void cardEqualsAndHashCode_ShouldWorkCorrectly() {
+        // Given
+        Card card1 = Card.builder()
+                .id(1L)
+                .cardHolder("TEST USER")
+                .expiryDate(LocalDate.of(2025, 12, 31))
+                .build();
+
+        Card card2 = Card.builder()
+                .id(1L)
+                .cardHolder("TEST USER")
+                .expiryDate(LocalDate.of(2025, 12, 31))
+                .build();
+
+        Card card3 = Card.builder()
+                .id(2L)
+                .cardHolder("OTHER USER")
+                .expiryDate(LocalDate.of(2024, 6, 30))
+                .build();
+
+        // Then
+        assertEquals(card1, card2);
+        assertNotEquals(card1, card3);
+        assertEquals(card1.hashCode(), card2.hashCode());
+    }
+}
+
+package com.bank.entity;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.security.core.GrantedAuthority;
+
+import java.util.Collection;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class UserTest {
+
+    @Test
+    void userAuthorities_ShouldReturnCorrectRoles() {
+        // Given
+        User user = User.builder()
+                .username("testuser")
+                .password("password")
+                .email("test@bank.com")
+                .role(User.Role.ROLE_ADMIN)
+                .build();
+
+        // When
+        Collection<? extends GrantedAuthority> authorities = user.getAuthorities();
+
+        // Then
+        assertNotNull(authorities);
+        assertTrue(authorities.stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN")));
+    }
+
+    @Test
+    void userAccountStatus_ShouldAlwaysBeActive() {
+        // Given
+        User user = User.builder()
+                .username("testuser")
+                .password("password")
+                .email("test@bank.com")
+                .role(User.Role.ROLE_USER)
+                .build();
+
+        // Then
+        assertTrue(user.isAccountNonExpired());
+        assertTrue(user.isAccountNonLocked());
+        assertTrue(user.isCredentialsNonExpired());
+        assertTrue(user.isEnabled());
+    }
+
+    @Test
+    void userEqualsAndHashCode_ShouldWorkCorrectly() {
+        // Given
+        User user1 = User.builder()
+                .id(1L)
+                .username("user1")
+                .email("user1@bank.com")
+                .build();
+
+        User user2 = User.builder()
+                .id(1L)
+                .username("user1")
+                .email("user1@bank.com")
+                .build();
+
+        User user3 = User.builder()
+                .id(2L)
+                .username("user2")
+                .email("user2@bank.com")
+                .build();
+
+        // Then
+        assertEquals(user1, user2);
+        assertNotEquals(user1, user3);
+        assertEquals(user1.hashCode(), user2.hashCode());
+    }
+}
+
+package com.bank.repository;
+
+import com.bank.entity.User;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@DataJpaTest
+@ActiveProfiles("test")
+class UserRepositoryTest {
+
+    @Autowired
+    private TestEntityManager entityManager;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void findByUsername_UserExists_ShouldReturnUser() {
+        // Given
+        User user = User.builder()
+                .username("testuser")
+                .password("password")
+                .email("test@bank.com")
+                .role(User.Role.ROLE_USER)
+                .build();
+        entityManager.persistAndFlush(user);
+
+        // When
+        Optional<User> found = userRepository.findByUsername("testuser");
+
+        // Then
+        assertTrue(found.isPresent());
+        assertEquals("testuser", found.get().getUsername());
+    }
+
+    @Test
+    void findByUsername_UserNotExists_ShouldReturnEmpty() {
+        // When
+        Optional<User> found = userRepository.findByUsername("nonexistent");
+
+        // Then
+        assertFalse(found.isPresent());
+    }
+
+    @Test
+    void existsByUsername_UserExists_ShouldReturnTrue() {
+        // Given
+        User user = User.builder()
+                .username("existinguser")
+                .password("password")
+                .email("existing@bank.com")
+                .role(User.Role.ROLE_USER)
+                .build();
+        entityManager.persistAndFlush(user);
+
+        // When
+        boolean exists = userRepository.existsByUsername("existinguser");
+
+        // Then
+        assertTrue(exists);
+    }
+}
+
+package com.bank.security;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
+import java.util.Collections;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class JwtTokenProviderTest {
+
+    private JwtTokenProvider jwtTokenProvider;
+
+    @BeforeEach
+    void setUp() {
+        jwtTokenProvider = new JwtTokenProvider("test-secret-key-very-long-secret-key-for-testing-purposes-here", 86400000);
+    }
+
+    @Test
+    void generateToken_ShouldCreateValidToken() {
+        // Given
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "testuser",
+                "password",
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+
+        // When
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        // Then
+        assertNotNull(token);
+        assertFalse(token.isEmpty());
+    }
+
+    @Test
+    void getUsernameFromJWT_ShouldExtractUsername() {
+        // Given
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "testuser",
+                "password",
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        // When
+        String username = jwtTokenProvider.getUsernameFromJWT(token);
+
+        // Then
+        assertEquals("testuser", username);
+    }
+
+    @Test
+    void validateToken_ValidToken_ShouldReturnTrue() {
+        // Given
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "testuser",
+                "password",
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        // When
+        boolean isValid = jwtTokenProvider.validateToken(token);
+
+        // Then
+        assertTrue(isValid);
+    }
+
+    @Test
+    void validateToken_InvalidToken_ShouldReturnFalse() {
+        // Given
+        String invalidToken = "invalid.token.here";
+
+        // When
+        boolean isValid = jwtTokenProvider.validateToken(invalidToken);
+
+        // Then
+        assertFalse(isValid);
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.AuditLog;
+import com.bank.repository.AuditLogRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+
+import java.math.BigDecimal;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AuditServiceTest {
+
+    @Mock
+    private AuditLogRepository auditLogRepository;
+
+    @Mock
+    private HttpServletRequest request;
+
+    @Mock
+    private SecurityContext securityContext;
+
+    @Mock
+    private Authentication authentication;
+
+    private AuditService auditService;
+
+    @BeforeEach
+    void setUp() {
+        auditService = new AuditService(auditLogRepository);
+        SecurityContextHolder.setContext(securityContext);
+
+        // Настраиваем моки для SecurityContext
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getName()).thenReturn("testuser");
+    }
+
+    @Test
+    void logActivity_WithRequest_ShouldSaveAuditLog() {
+        // Given
+        when(request.getHeader("User-Agent")).thenReturn("Test-Agent");
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null); // Добавляем этот мок
+
+        // When
+        auditService.logActivity("TEST_ACTION", "Test description", true,
+                "resource123", "request details", request);
+
+        // Then
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void logActivity_WithoutRequest_ShouldSaveAuditLog() {
+        // When
+        auditService.logActivity("TEST_ACTION", "Test description", true,
+                "resource123", "request details", null);
+
+        // Then
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void logSecurityEvent_ShouldCallLogActivity() {
+        // Given
+        when(request.getHeader("User-Agent")).thenReturn("Test-Agent");
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+
+        // When
+        auditService.logSecurityEvent("LOGIN_SUCCESS", "User logged in", true, request);
+
+        // Then
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void logTransferActivity_Success_ShouldCallLogActivity() {
+        // Given
+        when(request.getHeader("User-Agent")).thenReturn("Test-Agent");
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+
+        // When
+        auditService.logTransferActivity(1L, 2L, new BigDecimal("100.00"), true, null, request);
+
+        // Then
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void logTransferActivity_Failed_ShouldCallLogActivityTwice() {
+        // Given
+        when(request.getHeader("User-Agent")).thenReturn("Test-Agent");
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+
+        // When
+        auditService.logTransferActivity(1L, 2L, new BigDecimal("100.00"), false, "Insufficient funds", request);
+
+        // Then
+        verify(auditLogRepository, times(2)).save(any(AuditLog.class));
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.User;
+import com.bank.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AuthServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    private AuthService authService;
+
+    @BeforeEach
+    void setUp() {
+        authService = new AuthService(userRepository);
+    }
+
+    @Test
+    void loadUserByUsername_UserExists_ShouldReturnUserDetails() {
+        // Given
+        User user = User.builder()
+                .id(1L)
+                .username("testuser")
+                .password("password")
+                .email("test@bank.com")
+                .role(User.Role.ROLE_USER)
+                .build();
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        // When
+        UserDetails userDetails = authService.loadUserByUsername("testuser");
+
+        // Then
+        assertNotNull(userDetails);
+        assertEquals("testuser", userDetails.getUsername());
+        assertEquals("password", userDetails.getPassword());
+        assertTrue(userDetails.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_USER")));
+    }
+
+    @Test
+    void loadUserByUsername_UserNotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThrows(UsernameNotFoundException.class,
+                () -> authService.loadUserByUsername("nonexistent"));
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.Card;
+import com.bank.entity.User;
+import com.bank.exception.CardNotFoundException;
+import com.bank.exception.UnauthorizedAccessException;
+import com.bank.repository.CardRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CardServiceTest {
+
+    @Mock
+    private CardRepository cardRepository;
+
+    @Mock
+    private EncryptionService encryptionService;
+
+    @Mock
+    private TransactionService transactionService;
+
+    @Mock
+    private MonitoringService monitoringService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private AuditService auditService;
+
+    private CardService cardService;
+
+    private User testUser;
+    private User adminUser;
+    private Card testCard;
+
+    @BeforeEach
+    void setUp() {
+        cardService = new CardService(cardRepository, encryptionService, transactionService,
+                monitoringService, eventPublisher, auditService);
+
+        testUser = User.builder()
+                .id(1L)
+                .username("testuser")
+                .password("password")
+                .email("test@bank.com")
+                .role(User.Role.ROLE_USER)
+                .build();
+
+        adminUser = User.builder()
+                .id(2L)
+                .username("admin")
+                .password("adminpass")
+                .email("admin@bank.com")
+                .role(User.Role.ROLE_ADMIN)
+                .build();
+
+        testCard = Card.builder()
+                .id(1L)
+                .cardNumber("encrypted1234567890123456")
+                .cardHolder("TEST USER")
+                .expiryDate(LocalDate.now().plusYears(2))
+                .balance(new BigDecimal("1000.00"))
+                .status(Card.CardStatus.ACTIVE)
+                .user(testUser)
+                .build();
+    }
+
+    @Test
+    void getCardById_UserOwnsCard_ShouldReturnCard() {
+        // Given
+        when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
+
+        // When
+        Card result = cardService.getCardById(1L, testUser);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(testCard.getId(), result.getId());
+    }
+
+    @Test
+    void getCardById_AdminUser_ShouldReturnCard() {
+        // Given
+        when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
+
+        // When
+        Card result = cardService.getCardById(1L, adminUser);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(testCard.getId(), result.getId());
+    }
+
+    @Test
+    void getCardById_CardNotFound_ShouldThrowException() {
+        // Given
+        when(cardRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThrows(CardNotFoundException.class,
+                () -> cardService.getCardById(1L, testUser));
+    }
+
+    @Test
+    void getCardById_UserNotOwnerAndNotAdmin_ShouldThrowException() {
+        // Given
+        User otherUser = User.builder()
+                .id(3L)
+                .username("otheruser")
+                .role(User.Role.ROLE_USER)
+                .build();
+
+        when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
+
+        // When & Then
+        assertThrows(UnauthorizedAccessException.class,
+                () -> cardService.getCardById(1L, otherUser));
+    }
+
+    @Test
+    void getMaskedCardNumber_ShouldReturnMaskedNumber() {
+        // Given
+        when(encryptionService.decrypt("encrypted1234567890123456")).thenReturn("1234567890123456");
+
+        // When
+        String masked = cardService.getMaskedCardNumber("encrypted1234567890123456");
+
+        // Then
+        assertEquals("**** **** **** 3456", masked);
+    }
+
+    @Test
+    void getMaskedCardNumber_DecryptionFails_ShouldReturnDefault() {
+        // Given
+        when(encryptionService.decrypt("invalid-encrypted")).thenThrow(new RuntimeException("Decryption error"));
+
+        // When
+        String masked = cardService.getMaskedCardNumber("invalid-encrypted");
+
+        // Then
+        assertEquals("**** **** **** ****", masked);
+    }
+}
+
+package com.bank.service;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class EncryptionServiceTest {
+
+    private EncryptionService encryptionService;
+
+    @BeforeEach
+    void setUp() {
+        encryptionService = new EncryptionService("test-encryption-key-32-chars-long!");
+    }
+
+    @Test
+    void encryptAndDecrypt_ShouldWorkCorrectly() {
+        // Given
+        String originalText = "1234567890123456";
+
+        // When
+        String encrypted = encryptionService.encrypt(originalText);
+        String decrypted = encryptionService.decrypt(encrypted);
+
+        // Then
+        assertNotNull(encrypted);
+        assertNotNull(decrypted);
+        assertEquals(originalText, decrypted);
+        assertNotEquals(originalText, encrypted);
+    }
+
+    @Test
+    void encrypt_NullInput_ShouldReturnNull() {
+        assertNull(encryptionService.encrypt(null));
+    }
+
+    @Test
+    void decrypt_NullInput_ShouldReturnNull() {
+        assertNull(encryptionService.decrypt(null));
+    }
+}
+
+package com.bank.service;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import java.math.BigDecimal;
+import static org.junit.jupiter.api.Assertions.*;
+
+class MonitoringServiceTest {
+
+    private MonitoringService monitoringService;
+
+    @BeforeEach
+    void setUp() {
+        monitoringService = new MonitoringService();
+    }
+
+    @Test
+    void recordSuccessfulLogin_ShouldIncrementCounter() {
+        monitoringService.recordSuccessfulLogin("testuser");
+        assertEquals(1, monitoringService.getMetric("login.success"));
+    }
+
+    @Test
+    void recordFailedLogin_ShouldIncrementCounter() {
+        monitoringService.recordFailedLogin("testuser");
+        assertEquals(1, monitoringService.getMetric("login.failure"));
+    }
+
+    @Test
+    void recordTransfer_ShouldIncrementCounter() {
+        monitoringService.recordTransfer("user1", "user2", new BigDecimal("100.00"));
+        assertEquals(1, monitoringService.getMetric("transfer.completed"));
+    }
+
+    @Test
+    void getMetric_NonExistentMetric_ShouldReturnZero() {
+        assertEquals(0, monitoringService.getMetric("nonexistent.metric"));
+    }
+}
+
+package com.bank.service;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(MockitoExtension.class)
+class PasswordPolicyServiceTest {
+
+    private PasswordPolicyService passwordPolicyService;
+
+    @BeforeEach
+    void setUp() {
+        passwordPolicyService = new PasswordPolicyService();
+    }
+
+    @Test
+    void validatePassword_StrongPassword_ShouldReturnTrue() {
+        String strongPassword = "StrongPass123!";
+        boolean isValid = passwordPolicyService.validatePassword(strongPassword);
+        assertTrue(isValid, "Strong password with all categories should be valid");
+    }
+
+    @Test
+    void validatePassword_TooShort_ShouldReturnFalse() {
+        String shortPassword = "Short1!";
+        boolean isValid = passwordPolicyService.validatePassword(shortPassword);
+        assertFalse(isValid, "Password shorter than 8 characters should be invalid");
+    }
+
+    @Test
+    void validatePassword_NullPassword_ShouldReturnFalse() {
+        boolean isValid = passwordPolicyService.validatePassword(null);
+        assertFalse(isValid, "Null password should be invalid");
+    }
+
+    @Test
+    void validatePassword_NoUppercase_ShouldReturnFalse() {
+        String noUppercase = "lowercase123!";
+        boolean isValid = passwordPolicyService.validatePassword(noUppercase);
+        assertFalse(isValid, "Password without uppercase should be invalid");
+    }
+
+    @Test
+    void validatePassword_UpperCaseLowerCaseDigits_ShouldReturnTrue() {
+        String password = "Password123";
+        boolean isValid = passwordPolicyService.validatePassword(password);
+        assertTrue(isValid, "Password with uppercase, lowercase and digits should be valid");
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.Transaction;
+import com.bank.repository.TransactionRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class TransactionReportServiceTest {
+
+    @Mock
+    private TransactionRepository transactionRepository;
+
+    private TransactionReportService transactionReportService;
+
+    @BeforeEach
+    void setUp() {
+        transactionReportService = new TransactionReportService(transactionRepository);
+    }
+
+    @Test
+    void getDailyTransactionReport_ShouldReturnReport() {
+        // Given
+        when(transactionRepository.countByTransactionDateBetween(any(), any())).thenReturn(10L);
+        when(transactionRepository.sumAmountByTransactionDateBetween(any(), any())).thenReturn(new BigDecimal("1000.00"));
+        when(transactionRepository.countByStatusAndTransactionDateBetween(any(), any(), any())).thenReturn(8L);
+
+        // When
+        Map<String, Object> report = transactionReportService.getDailyTransactionReport();
+
+        // Then
+        assertNotNull(report);
+        assertEquals(10L, report.get("totalTransactions"));
+        assertEquals(8L, report.get("successfulTransactions"));
+        assertEquals(2L, report.get("failedTransactions"));
+        assertEquals(new BigDecimal("1000.00"), report.get("totalAmount"));
+    }
+
+    @Test
+    void getUserTransactionStats_ShouldReturnStats() {
+        // Given
+        when(transactionRepository.countByUserInLast30Days(any(), any())).thenReturn(5L);
+        when(transactionRepository.sumAmountByUserInLast30Days(any(), any())).thenReturn(new BigDecimal("500.00"));
+
+        // When
+        Map<String, Object> stats = transactionReportService.getUserTransactionStats(1L);
+
+        // Then
+        assertNotNull(stats);
+        assertEquals(1L, stats.get("userId"));
+        assertEquals(5L, stats.get("totalTransactions"));
+        assertEquals(new BigDecimal("500.00"), stats.get("totalAmount"));
+        assertEquals(new BigDecimal("100.00"), stats.get("averageAmount"));
+    }
+}
+
+package com.bank.service;
+
+import com.bank.entity.User;
+import com.bank.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private UserService userService;
+
+    @Test
+    void getUserById_UserExists_ShouldReturnUser() {
+        // Given
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("testuser");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        // When
+        User result = userService.getUserById(1L);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        assertEquals("testuser", result.getUsername());
+    }
+
+    @Test
+    void getUserById_UserNotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThrows(UsernameNotFoundException.class,
+                () -> userService.getUserById(1L));
+    }
+
+    @Test
+    void getUserByUsername_UserExists_ShouldReturnUser() {
+        // Given
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("testuser");
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        // When
+        User result = userService.getUserByUsername("testuser");
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        assertEquals("testuser", result.getUsername());
+    }
+
+    @Test
+    void getUserByUsername_UserNotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThrows(UsernameNotFoundException.class,
+                () -> userService.getUserByUsername("nonexistent"));
+    }
+}
+
+package com.bank;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class BankApplicationTest {
+
+    @Test
+    void contextLoads() {
+        // Просто проверяем, что контекст загружается
+    }
+}
+
+package com.bank;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class ContextLoadTest {
+
+    @Test
+    void contextLoads() {
+        // Просто проверяем, что контекст Spring загружается
+    }
+}
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.classpath
+.project
+.settings/
+bin/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+*.log
+*.lst
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+log/
+*.log.*
+
+# Database
+*.db
+*.sqlite
+*.h2.db
+
+# Application specific
+application-local.yml
+application-dev.yml
+application-prod.yml
+/config/application-*.yml
+
+# Docker
+docker-compose.override.yml
+/.env
+
+# Build outputs
+bank-rest-*.jar
+!/target/*.jar
+
+# Temp files
+*.tmp
+*.temp
+
+# Coverage reports
+jacoco.exec
+*.exec
+
+# Dependency check
+dependency-check-report.html
+
+@REM ----------------------------------------------------------------------------
+@REM Licensed to the Apache Software Foundation (ASF) under one
+@REM or more contributor license agreements.  See the NOTICE file
+@REM distributed with this work for additional information
+@REM regarding copyright ownership.  The ASF licenses this file
+@REM to you under the Apache License, Version 2.0 (the
+@REM "License"); you may not use this file except in compliance
+@REM with the License.  You may obtain a copy of the License at
+@REM
+@REM    http://www.apache.org/licenses/LICENSE-2.0
+@REM
+@REM Unless required by applicable law or agreed to in writing,
+@REM software distributed under the License is distributed on an
+@REM "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+@REM KIND, either express or implied.  See the License for the
+@REM specific language governing permissions and limitations
+@REM under the License.
+@REM ----------------------------------------------------------------------------
+
+@REM ----------------------------------------------------------------------------
+@REM Apache Maven Wrapper startup batch script, version 3.2.0
+@REM
+@REM Required ENV vars:
+@REM JAVA_HOME - location of a JDK home dir
+@REM
+@REM Optional ENV vars
+@REM MAVEN_BATCH_ECHO - set to 'on' to enable the echoing of the batch commands
+@REM MAVEN_BATCH_PAUSE - set to 'on' to wait for a keystroke before ending
+@REM MAVEN_OPTS - parameters passed to the Java VM when running Maven
+@REM     e.g. to debug Maven itself, use
+@REM set MAVEN_OPTS=-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000
+@REM MAVEN_SKIP_RC - flag to disable loading of mavenrc files
+@REM ----------------------------------------------------------------------------
+
+@REM Begin all REM lines with '@' in case MAVEN_BATCH_ECHO is 'on'
+@echo off
+@REM set title of command window
+title %0
+@REM enable echoing by setting MAVEN_BATCH_ECHO to 'on'
+@if "%MAVEN_BATCH_ECHO%" == "on"  echo %MAVEN_BATCH_ECHO%
+
+@REM set %HOME% to equivalent of $HOME
+if "%HOME%" == "" (set "HOME=%HOMEDRIVE%%HOMEPATH%")
+
+@REM Execute a user defined script before this one
+if not "%MAVEN_SKIP_RC%" == "" goto skipRcPre
+@REM check for pre script, once with legacy .bat ending and once with .cmd ending
+if exist "%USERPROFILE%\mavenrc_pre.bat" call "%USERPROFILE%\mavenrc_pre.bat" %*
+if exist "%USERPROFILE%\mavenrc_pre.cmd" call "%USERPROFILE%\mavenrc_pre.cmd" %*
+:skipRcPre
+
+@setlocal
+
+set ERROR_CODE=0
+
+@REM To isolate internal variables from possible post scripts, we use another setlocal
+@setlocal
+
+@REM ==== START VALIDATION ====
+if not "%JAVA_HOME%" == "" goto OkJHome
+
+echo.
+echo Error: JAVA_HOME not found in your environment. >&2
+echo Please set the JAVA_HOME variable in your environment to match the >&2
+echo location of your Java installation. >&2
+echo.
+goto error
+
+:OkJHome
+if exist "%JAVA_HOME%\bin\java.exe" goto init
+
+echo.
+echo Error: JAVA_HOME is set to an invalid directory. >&2
+echo JAVA_HOME = "%JAVA_HOME%" >&2
+echo Please set the JAVA_HOME variable in your environment to match the >&2
+echo location of your Java installation. >&2
+echo.
+goto error
+
+@REM ==== END VALIDATION ====
+
+:init
+
+@REM Find the project base dir, i.e. the directory that contains the folder ".mvn".
+@REM Fallback to current working directory if not found.
+
+set MAVEN_PROJECTBASEDIR=%MAVEN_BASEDIR%
+IF NOT "%MAVEN_PROJECTBASEDIR%"=="" goto endDetectBaseDir
+
+set EXEC_DIR=%CD%
+set WDIR=%EXEC_DIR%
+:findBaseDir
+IF EXIST "%WDIR%"\.mvn goto baseDirFound
+cd ..
+IF "%WDIR%"=="%CD%" goto baseDirNotFound
+set WDIR=%CD%
+goto findBaseDir
+
+:baseDirFound
+set MAVEN_PROJECTBASEDIR=%WDIR%
+cd "%EXEC_DIR%"
+goto endDetectBaseDir
+
+:baseDirNotFound
+set MAVEN_PROJECTBASEDIR=%EXEC_DIR%
+cd "%EXEC_DIR%"
+
+:endDetectBaseDir
+
+IF NOT EXIST "%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config" goto endReadAdditionalConfig
+
+@setlocal EnableExtensions EnableDelayedExpansion
+for /F "usebackq delims=" %%a in ("%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config") do set JVM_CONFIG=!JVM_CONFIG! %%a
+@endlocal & set JVM_CONFIG=%JVM_CONFIG%
+
+:endReadAdditionalConfig
+
+SET MAVEN_JAVA_EXE="%JAVA_HOME%\bin\java.exe"
+set WRAPPER_JAR="%MAVEN_PROJECTBASEDIR%\.mvn\wrapper\maven-wrapper.jar"
+set WRAPPER_LAUNCHER=org.apache.maven.wrapper.MavenWrapperMain
+
+set DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"
+
+FOR /F "usebackq tokens=1,2 delims==" %%A IN ("%MAVEN_PROJECTBASEDIR%\.mvn\wrapper\maven-wrapper.properties") DO (
+    IF "%%A"=="wrapperUrl" SET DOWNLOAD_URL=%%B
+)
+
+@REM Extension to allow automatically downloading the maven-wrapper.jar from Maven-central
+@REM This allows using the maven wrapper in projects that prohibit checking in binary data.
+if exist %WRAPPER_JAR% (
+    if "%MVNW_VERBOSE%" == "true" (
+        echo Found %WRAPPER_JAR%
+    )
+) else (
+    if not "%MVNW_REPOURL%" == "" (
+        SET DOWNLOAD_URL="%MVNW_REPOURL%/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"
+    )
+    if "%MVNW_VERBOSE%" == "true" (
+        echo Couldn't find %WRAPPER_JAR%, downloading it ...
+        echo Downloading from: %DOWNLOAD_URL%
+    )
+)
+
+powershell -Command "&{"^
+	"$webclient = new-object System.Net.WebClient;"^
+	"if (-not ([string]::IsNullOrEmpty('%MVNW_USERNAME%') -and [string]::IsNullOrEmpty('%MVNW_PASSWORD%'))) {"^
+	"$webclient.Credentials = new-object System.Net.NetworkCredential('%MVNW_USERNAME%', '%MVNW_PASSWORD%');"^
+	"}"^
+	"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $webclient.DownloadFile('%DOWNLOAD_URL%', '%WRAPPER_JAR%')"^
+	"}"
+if exist %WRAPPER_JAR% (
+    if "%MVNW_VERBOSE%" == "true" (
+        echo Finished downloading %WRAPPER_JAR%
+    )
+) else (
+    echo Couldn't download %WRAPPER_JAR%, please download it manually from %DOWNLOAD_URL% and place it under %WRAPPER_JAR%
+    exit /b 1
+)
+
+@REM Provide a "standardized" way to retrieve the CLI args that will
+@REM work with both Windows and non-Windows executions.
+set MAVEN_CMD_LINE_ARGS=%*
+
+%MAVEN_JAVA_EXE% ^
+  %JVM_CONFIG% ^
+  %MAVEN_OPTS% ^
+  %MAVEN_DEBUG_OPTS% ^
+  -classpath %WRAPPER_JAR% ^
+  "-Dmaven.multiModuleProjectDirectory=%MAVEN_PROJECTBASEDIR%" ^
+  %WRAPPER_LAUNCHER% %MAVEN_CONFIG% %*
+if ERRORLEVEL 1 goto error
+goto end
+
+:error
+set ERROR_CODE=1
+
+:end
+@endlocal & set ERROR_CODE=%ERROR_CODE%
+
+if not "%MAVEN_SKIP_RC%"=="" goto skipRcPost
+@REM check for post script, once with legacy .bat ending and once with .cmd ending
+if exist "%USERPROFILE%\mavenrc_post.bat" call "%USERPROFILE%\mavenrc_post.bat"
+if exist "%USERPROFILE%\mavenrc_post.cmd" call "%USERPROFILE%\mavenrc_post.cmd"
+:skipRcPost
+
+@REM pause the script if MAVEN_BATCH_PAUSE is set to 'on'
+if "%MAVEN_BATCH_PAUSE%"=="on" pause
+
+if "%MAVEN_TERMINATE_CMD%"=="on" exit %ERROR_CODE%
+
+cmd /C exit /B %ERROR_CODE%
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.bank</groupId>
+    <artifactId>bank-rest</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Bank REST API</name>
+    <description>Bank Card Management System with JWT authentication</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <jjwt.version>0.11.5</jjwt.version>
+        <springdoc.version>2.3.0</springdoc.version>
+        <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Core Starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- Database -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+
+        <!-- JWT -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- OpenAPI Documentation -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test Dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/Abstract*.java</exclude>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+Внимательно проанализируй прооект. Пересобери его, чтобы он соответствовал всем требованиям и проходил все тесты. Всё исправь, файлы переписывай полностью.

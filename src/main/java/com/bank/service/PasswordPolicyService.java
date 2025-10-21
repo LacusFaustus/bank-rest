@@ -16,24 +16,24 @@ public class PasswordPolicyService {
     private static final Pattern DIGIT_PATTERN = Pattern.compile("[0-9]");
     private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile("[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]");
 
-    // Убираем конструктор по умолчанию, используем только Spring-инъекцию
-    public PasswordPolicyService() {
-        // Пустой конструктор для Spring
-    }
-
     public boolean validatePassword(String password) {
         if (password == null) {
-            log.warn("Password is null");
+            log.debug("Password is null - validation failed");
+            return false;
+        }
+
+        // Для пустых строк сразу возвращаем false без подробного логирования
+        if (password.isEmpty()) {
+            log.debug("Password is empty - validation failed");
             return false;
         }
 
         if (password.length() < MIN_PASSWORD_LENGTH || password.length() > MAX_PASSWORD_LENGTH) {
-            log.warn("Password length invalid: {} (must be between {} and {})",
+            log.debug("Password length invalid: {} (must be between {} and {})",
                     password.length(), MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH);
             return false;
         }
 
-        // Обязательные требования - СТРОГАЯ ВАЛИДАЦИЯ
         boolean hasUppercase = UPPERCASE_PATTERN.matcher(password).find();
         boolean hasLowercase = LOWERCASE_PATTERN.matcher(password).find();
         boolean hasDigit = DIGIT_PATTERN.matcher(password).find();
@@ -42,9 +42,8 @@ public class PasswordPolicyService {
         log.debug("Password validation - Uppercase: {}, Lowercase: {}, Digit: {}, Special: {}",
                 hasUppercase, hasLowercase, hasDigit, hasSpecialChar);
 
-        // СТРОГИЕ ТРЕБОВАНИЯ: обязательно верхний регистр + минимум 2 другие категории
         if (!hasUppercase) {
-            log.warn("Password must contain at least one uppercase letter");
+            log.debug("Password must contain at least one uppercase letter");
             return false;
         }
 
@@ -53,11 +52,11 @@ public class PasswordPolicyService {
         if (hasDigit) additionalRequirementsMet++;
         if (hasSpecialChar) additionalRequirementsMet++;
 
-        // Требуем как минимум 2 дополнительные категории
-        boolean isValid = additionalRequirementsMet >= 2;
+        // Требуем минимум одну дополнительную категорию (строчные буквы, цифры или специальные символы)
+        boolean isValid = additionalRequirementsMet >= 1;
 
         if (!isValid) {
-            log.warn("Password complexity requirements not met. Required: uppercase + 2 additional categories, Actual additional: {}", additionalRequirementsMet);
+            log.debug("Password complexity requirements not met. Required: uppercase + 1 additional category, Actual additional: {}", additionalRequirementsMet);
         }
 
         return isValid;
@@ -65,7 +64,7 @@ public class PasswordPolicyService {
 
     public String generatePasswordRequirementsMessage() {
         return String.format(
-                "Password must be between %d and %d characters long and contain: at least one uppercase letter, and at least two of the following: lowercase letters, numbers, special characters",
+                "Password must be between %d and %d characters long and contain: at least one uppercase letter, and at least one of the following: lowercase letters, numbers, special characters",
                 MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH
         );
     }

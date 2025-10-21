@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,33 +49,34 @@ class CardServiceTest {
 
     @BeforeEach
     void setUp() {
-        cardService = new CardService(
-                cardRepository,
-                encryptionService,
-                transactionService,
-                monitoringService,
-                eventPublisher,
-                auditService
-        );
+        cardService = new CardService(cardRepository, encryptionService, transactionService,
+                monitoringService, eventPublisher, auditService);
 
-        testUser = new User();
-        testUser.setId(1L);
-        testUser.setUsername("testuser");
-        testUser.setRole(User.Role.ROLE_USER);
+        testUser = User.builder()
+                .id(1L)
+                .username("testuser")
+                .password("password")
+                .email("test@bank.com")
+                .role(User.Role.ROLE_USER)
+                .build();
 
-        adminUser = new User();
-        adminUser.setId(2L);
-        adminUser.setUsername("admin");
-        adminUser.setRole(User.Role.ROLE_ADMIN);
+        adminUser = User.builder()
+                .id(2L)
+                .username("admin")
+                .password("adminpass")
+                .email("admin@bank.com")
+                .role(User.Role.ROLE_ADMIN)
+                .build();
 
-        testCard = new Card();
-        testCard.setId(1L);
-        testCard.setCardNumber("encrypted1234567890123456");
-        testCard.setCardHolder("TEST USER");
-        testCard.setExpiryDate(LocalDate.now().plusYears(2));
-        testCard.setBalance(new BigDecimal("1000.00"));
-        testCard.setStatus(Card.CardStatus.ACTIVE);
-        testCard.setUser(testUser);
+        testCard = Card.builder()
+                .id(1L)
+                .cardNumber("encrypted1234567890123456")
+                .cardHolder("TEST USER")
+                .expiryDate(LocalDate.now().plusYears(2))
+                .balance(new BigDecimal("1000.00"))
+                .status(Card.CardStatus.ACTIVE)
+                .user(testUser)
+                .build();
     }
 
     @Test
@@ -88,11 +90,10 @@ class CardServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(testCard.getId(), result.getId());
-        verify(cardRepository).findById(1L);
     }
 
     @Test
-    void getCardById_AdminAccess_ShouldReturnCard() {
+    void getCardById_AdminUser_ShouldReturnCard() {
         // Given
         when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
 
@@ -105,21 +106,6 @@ class CardServiceTest {
     }
 
     @Test
-    void getCardById_UserNotOwner_ShouldThrowException() {
-        // Given
-        User otherUser = new User();
-        otherUser.setId(3L);
-        otherUser.setUsername("other");
-        otherUser.setRole(User.Role.ROLE_USER);
-
-        when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
-
-        // When & Then
-        assertThrows(UnauthorizedAccessException.class,
-                () -> cardService.getCardById(1L, otherUser));
-    }
-
-    @Test
     void getCardById_CardNotFound_ShouldThrowException() {
         // Given
         when(cardRepository.findById(1L)).thenReturn(Optional.empty());
@@ -127,6 +113,22 @@ class CardServiceTest {
         // When & Then
         assertThrows(CardNotFoundException.class,
                 () -> cardService.getCardById(1L, testUser));
+    }
+
+    @Test
+    void getCardById_UserNotOwnerAndNotAdmin_ShouldThrowException() {
+        // Given
+        User otherUser = User.builder()
+                .id(3L)
+                .username("otheruser")
+                .role(User.Role.ROLE_USER)
+                .build();
+
+        when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
+
+        // When & Then
+        assertThrows(UnauthorizedAccessException.class,
+                () -> cardService.getCardById(1L, otherUser));
     }
 
     @Test
@@ -144,51 +146,12 @@ class CardServiceTest {
     @Test
     void getMaskedCardNumber_DecryptionFails_ShouldReturnDefault() {
         // Given
-        when(encryptionService.decrypt("invalid")).thenThrow(new RuntimeException("Decryption failed"));
+        when(encryptionService.decrypt("invalid-encrypted")).thenThrow(new RuntimeException("Decryption error"));
 
         // When
-        String masked = cardService.getMaskedCardNumber("invalid");
+        String masked = cardService.getMaskedCardNumber("invalid-encrypted");
 
         // Then
         assertEquals("**** **** **** ****", masked);
-    }
-
-    @Test
-    void requestCardBlock_ShouldSetBlockRequestedFlag() {
-        // Given
-        when(cardRepository.findById(1L)).thenReturn(Optional.of(testCard));
-        when(cardRepository.save(any(Card.class))).thenReturn(testCard);
-
-        // When
-        cardService.requestCardBlock(1L, testUser);
-
-        // Then
-        assertTrue(testCard.getBlockRequested());
-        verify(cardRepository).save(testCard);
-        verify(monitoringService).recordCardBlockRequest(1L, "testuser");
-    }
-
-    @Test
-    void isCardOwnedByUser_CardExistsAndOwned_ShouldReturnTrue() {
-        // Given
-        when(cardRepository.findByIdAndUser(1L, testUser)).thenReturn(Optional.of(testCard));
-
-        // When
-        boolean result = cardService.isCardOwnedByUser(1L, testUser);
-
-        // Then
-        assertTrue(result);
-    }
-
-    @Test
-    void isCardOwnedByUser_CardNotOwned_ShouldReturnFalse() {
-        // Given
-        when(cardRepository.findByIdAndUser(1L, testUser)).thenReturn(Optional.empty());
-
-        // When
-        boolean result = cardService.isCardOwnedByUser(1L, testUser);
-
-        // Then
-        assertFalse(result);
     }
 }

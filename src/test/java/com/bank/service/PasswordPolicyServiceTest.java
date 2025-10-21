@@ -2,9 +2,12 @@ package com.bank.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(MockitoExtension.class)
 class PasswordPolicyServiceTest {
 
     private PasswordPolicyService passwordPolicyService;
@@ -16,130 +19,100 @@ class PasswordPolicyServiceTest {
 
     @Test
     void validatePassword_StrongPassword_ShouldReturnTrue() {
-        // Given
-        String strongPassword = "StrongPass123!"; // Все 4 категории
-
-        // When
+        String strongPassword = "StrongPass123!";
         boolean isValid = passwordPolicyService.validatePassword(strongPassword);
-
-        // Then
         assertTrue(isValid, "Strong password with all categories should be valid");
     }
 
     @Test
-    void validatePassword_TooShort_ShouldReturnFalse() {
-        // Given
-        String shortPassword = "Short1!"; // 7 символов
-
-        // When
-        boolean isValid = passwordPolicyService.validatePassword(shortPassword);
-
-        // Then
-        assertFalse(isValid, "Password shorter than 8 characters should be invalid");
-    }
-
-    @Test
-    void validatePassword_NullPassword_ShouldReturnFalse() {
-        // When
-        boolean isValid = passwordPolicyService.validatePassword(null);
-
-        // Then
-        assertFalse(isValid, "Null password should be invalid");
-    }
-
-    @Test
-    void validatePassword_NoUppercase_ShouldReturnFalse() {
-        // Given
-        String noUppercase = "lowercase123!"; // Нет верхнего регистра
-
-        // When
-        boolean isValid = passwordPolicyService.validatePassword(noUppercase);
-
-        // Then
-        assertFalse(isValid, "Password without uppercase should be invalid");
-    }
-
-    @Test
-    void validatePassword_OnlyUppercase_ShouldReturnFalse() {
-        // Given
-        String onlyUppercase = "UPPERCASE"; // Только верхний регистр
-
-        // When
-        boolean isValid = passwordPolicyService.validatePassword(onlyUppercase);
-
-        // Then
-        assertFalse(isValid, "Password with only uppercase should be invalid (needs 2 additional categories)");
-    }
-
-    @Test
     void validatePassword_UpperCaseLowerCaseDigits_ShouldReturnTrue() {
-        // Given
-        String password = "Password123"; // Верхний + нижний + цифры (3 категории)
-
-        // When
+        String password = "Password123";
         boolean isValid = passwordPolicyService.validatePassword(password);
-
-        // Then
         assertTrue(isValid, "Password with uppercase, lowercase and digits should be valid");
     }
 
     @Test
     void validatePassword_UpperCaseLowerCaseSpecial_ShouldReturnTrue() {
-        // Given
-        String password = "Password!"; // Верхний + нижний + спецсимволы (3 категории)
-
-        // When
+        String password = "Password!@#";
         boolean isValid = passwordPolicyService.validatePassword(password);
-
-        // Then
-        assertTrue(isValid, "Password with uppercase, lowercase and special chars should be valid");
+        assertTrue(isValid, "Password with uppercase, lowercase and special characters should be valid");
     }
 
     @Test
     void validatePassword_UpperCaseDigitsSpecial_ShouldReturnTrue() {
-        // Given
-        String password = "PASSWORD123!"; // Верхний + цифры + спецсимволы (3 категории)
-
-        // When
+        String password = "PASSWORD123!";
         boolean isValid = passwordPolicyService.validatePassword(password);
-
-        // Then
-        assertTrue(isValid, "Password with uppercase, digits and special chars should be valid");
+        assertTrue(isValid, "Password with uppercase, digits and special characters should be valid");
     }
 
     @Test
-    void validatePassword_UpperCaseLowerCaseOnly_ShouldReturnFalse() {
-        // Given
-        String password = "Password"; // Только верхний + нижний (2 категории)
-
-        // When
+    void validatePassword_OnlyUppercaseAndDigits_ShouldReturnTrue() {
+        String password = "PASSWORD123";
         boolean isValid = passwordPolicyService.validatePassword(password);
-
-        // Then
-        assertFalse(isValid, "Password with only uppercase and lowercase should be invalid (needs 3 categories total)");
+        assertTrue(isValid, "Password with uppercase and digits should be valid");
     }
 
     @Test
-    void validatePassword_UpperCaseDigitsOnly_ShouldReturnFalse() {
-        // Given
-        String password = "PASSWORD123"; // Только верхний + цифры (2 категории)
-
-        // When
+    void validatePassword_OnlyUppercaseAndSpecial_ShouldReturnTrue() {
+        String password = "PASSWORD!@#";
         boolean isValid = passwordPolicyService.validatePassword(password);
-
-        // Then
-        assertFalse(isValid, "Password with only uppercase and digits should be invalid (needs 3 categories total)");
+        assertTrue(isValid, "Password with uppercase and special characters should be valid");
     }
 
     @Test
-    void validatePassword_ValidComplexPassword_ShouldReturnTrue() {
-        // Given
-        String password = "MyPass123!"; // Верхний + нижний + цифры + спецсимволы
-
-        // When
+    void validatePassword_OnlyUppercaseAndLowercase_ShouldReturnTrue() {
+        String password = "Password";
         boolean isValid = passwordPolicyService.validatePassword(password);
+        assertTrue(isValid, "Password with uppercase and lowercase should be valid");
+    }
 
-        // Then
-        assertTrue(isValid, "Complex password should be valid");
+    @Test
+    void validatePassword_TooShort_ShouldReturnFalse() {
+        String shortPassword = "Short1!";
+        boolean isValid = passwordPolicyService.validatePassword(shortPassword);
+        assertFalse(isValid, "Password shorter than 8 characters should be invalid");
+    }
+
+    @Test
+    void validatePassword_TooLong_ShouldReturnFalse() {
+        String longPassword = "A".repeat(129) + "1!";
+        boolean isValid = passwordPolicyService.validatePassword(longPassword);
+        assertFalse(isValid, "Password longer than 128 characters should be invalid");
+    }
+
+    @Test
+    void validatePassword_NullPassword_ShouldReturnFalse() {
+        boolean isValid = passwordPolicyService.validatePassword(null);
+        assertFalse(isValid, "Null password should be invalid");
+    }
+
+    @Test
+    void validatePassword_EmptyPassword_ShouldReturnFalse() {
+        boolean isValid = passwordPolicyService.validatePassword("");
+        assertFalse(isValid, "Empty password should be invalid");
+    }
+
+    @Test
+    void validatePassword_NoUppercase_ShouldReturnFalse() {
+        String noUppercase = "lowercase123!";
+        boolean isValid = passwordPolicyService.validatePassword(noUppercase);
+        assertFalse(isValid, "Password without uppercase should be invalid");
+    }
+
+    @Test
+    void validatePassword_OnlyUppercase_ShouldReturnFalse() {
+        String onlyUppercase = "PASSWORD";
+        boolean isValid = passwordPolicyService.validatePassword(onlyUppercase);
+        assertFalse(isValid, "Password with only uppercase should be invalid");
+    }
+
+    @Test
+    void generatePasswordRequirementsMessage_ShouldReturnCorrectMessage() {
+        String message = passwordPolicyService.generatePasswordRequirementsMessage();
+        assertNotNull(message);
+        assertTrue(message.contains("8"));
+        assertTrue(message.contains("128"));
+        assertTrue(message.contains("uppercase"));
+        assertTrue(message.contains("one of the following"));
     }
 }
