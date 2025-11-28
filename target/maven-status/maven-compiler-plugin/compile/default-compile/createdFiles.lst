@@ -21,7 +21,6 @@ com\bank\controller\AuthController.class
 com\bank\config\SecurityConfig.class
 com\bank\dto\AuthRequest.class
 com\bank\service\RateLimitService$RateLimitInfo.class
-com\bank\service\RateLimitService$1.class
 com\bank\config\RateLimitConfig.class
 com\bank\entity\User$UserBuilder.class
 com\bank\repository\CardRepository.class
