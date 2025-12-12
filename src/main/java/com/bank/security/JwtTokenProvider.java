@@ -1,6 +1,7 @@
 package com.bank.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,84 +10,103 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Date;
 import java.util.stream.Collectors;
 
-@Component
 @Slf4j
+@Component
 public class JwtTokenProvider {
 
-    private final SecretKey signingKey;
-    private final long jwtExpirationInMs;
+    private final SecretKey secretKey;
+    private final long validityInMilliseconds;
 
-    public JwtTokenProvider(@Value("${jwt.secret:bank-rest-secret-key-2024-very-secure-and-long}") String jwtSecret,
-                            @Value("${jwt.expiration:86400000}") long jwtExpirationInMs) {
-        this.jwtExpirationInMs = jwtExpirationInMs;
-        this.signingKey = getSigningKey(jwtSecret);
-    }
+    public JwtTokenProvider(
+            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.expiration}") long validityInMilliseconds) {
 
-    private SecretKey getSigningKey(String jwtSecret) {
-        byte[] keyBytes;
-        if (jwtSecret.length() < 32) {
-            StringBuilder sb = new StringBuilder(jwtSecret);
-            while (sb.length() < 32) {
-                sb.append("0");
-            }
-            keyBytes = sb.substring(0, 32).getBytes();
-        } else if (jwtSecret.length() > 32) {
-            keyBytes = jwtSecret.substring(0, 32).getBytes();
-        } else {
-            keyBytes = jwtSecret.getBytes();
+        // Проверяем, является ли строка валидным Base64
+        String base64Secret;
+        try {
+            // Пытаемся декодировать как Base64
+            byte[] decoded = Base64.getDecoder().decode(secret);
+            // Если успешно, используем как есть
+            base64Secret = secret;
+        } catch (IllegalArgumentException e) {
+            // Если не Base64, конвертируем строку в Base64
+            log.info("JWT secret is not Base64, converting to Base64");
+            base64Secret = Base64.getEncoder()
+                    .encodeToString(secret.getBytes(StandardCharsets.UTF_8));
         }
-        return Keys.hmacShaKeyFor(keyBytes);
+
+        byte[] keyBytes = Decoders.BASE64.decode(base64Secret);
+        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+        this.validityInMilliseconds = validityInMilliseconds;
     }
 
     public String generateToken(Authentication authentication) {
-        String username = authentication.getName();
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        Date validity = new Date(now.getTime() + validityInMilliseconds);
 
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
 
         return Jwts.builder()
-                .setSubject(username)
-                .claim("authorities", authorities)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .subject(authentication.getName())
+                .claim("auth", authorities)
+                .issuedAt(now)
+                .expiration(validity)
+                .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
     }
 
-    public String getUsernameFromJWT(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(signingKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+    public boolean validateToken(String token) {
+        try {
+            if (token == null || token.trim().isEmpty()) {
+                return false;
+            }
 
-        return claims.getSubject();
+            Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            log.debug("Invalid JWT token: {}", e.getMessage());
+            return false;
+        }
     }
 
-    public boolean validateToken(String authToken) {
+    public String getUsernameFromToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(signingKey)
+            Claims claims = Jwts.parser()
+                    .verifyWith(secretKey)
                     .build()
-                    .parseClaimsJws(authToken);
-            return true;
-        } catch (MalformedJwtException ex) {
-            log.error("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            log.error("Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            log.error("Unsupported JWT token");
-        } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty");
-        } catch (Exception ex) {
-            log.error("JWT validation error: {}", ex.getMessage());
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.getSubject();
+        } catch (JwtException | IllegalArgumentException e) {
+            log.debug("Failed to get username from token: {}", e.getMessage());
+            return null;
         }
-        return false;
+    }
+
+    public String getUsernameFromJWT(String jwt) {
+        return getUsernameFromToken(jwt);
+    }
+
+    public Claims getClaimsFromToken(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (JwtException | IllegalArgumentException e) {
+            log.debug("Failed to get claims from token: {}", e.getMessage());
+            return null;
+        }
     }
 }

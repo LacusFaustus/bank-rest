@@ -1,36 +1,47 @@
 package com.bank.dto;
 
 import com.bank.entity.Card;
-import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-@Getter
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CardResponseDTO {
     private Long id;
-    private String cardNumber;
+    private String maskedCardNumber;
     private String cardHolder;
-
-    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate expiryDate;
-
     private BigDecimal balance;
     private Card.CardStatus status;
-    private String userUsername;
+    private LocalDateTime createdAt;
+    private Boolean blockRequested;
+    private Long userId;
+    private String userName;
 
     public static CardResponseDTO fromEntity(Card card, String maskedCardNumber) {
+        if (card == null) {
+            return null;
+        }
+
         return CardResponseDTO.builder()
                 .id(card.getId())
-                .cardNumber(maskedCardNumber)
+                .maskedCardNumber(maskedCardNumber)
                 .cardHolder(card.getCardHolder())
                 .expiryDate(card.getExpiryDate())
                 .balance(card.getBalance())
                 .status(card.getStatus())
-                .userUsername(card.getUser() != null ? card.getUser().getUsername() : null)
+                .createdAt(card.getCreatedAt())
+                .blockRequested(card.getBlockRequested())
+                .userId(card.getUser() != null ? card.getUser().getId() : null)
+                .userName(card.getUser() != null ? card.getUser().getUsername() : null)
                 .build();
     }
 }

@@ -16,9 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-// Временно отключаем инициализатор данных для отладки
-// @Component
-// @Profile("local")
+@Component
+@Profile("local")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
@@ -30,78 +29,137 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     @Transactional
-    public void run(String... args) throws Exception {
-        log.info("Data initializer is temporarily disabled for debugging");
+    public void run(String... args) {
+        try {
+            log.info("Starting data initialization for local development...");
 
-        // Временно закомментируем всю логику инициализации
-        /*
-        log.info("Initializing data for local development...");
+            if (userRepository.count() > 0) {
+                log.info("Data already initialized. Skipping...");
+                return;
+            }
 
-        // Создаем администратора
-        if (userRepository.findByUsername("admin").isEmpty()) {
-            User admin = User.builder()
-                    .username("admin")
-                    .password(passwordEncoder.encode("admin123"))
-                    .email("admin@bank.com")
-                    .role(User.Role.ROLE_ADMIN)
-                    .build();
-            userRepository.save(admin);
-            log.info("Admin user created: admin/admin123");
+            initializeAdmin();
+            initializeUsers();
 
-            // Создаем карту для администратора
-            String encryptedCardNumber = encryptionService.encrypt("1234567890123456");
-            log.debug("Encrypted card number length: {}", encryptedCardNumber.length());
+            log.info("Data initialization completed");
+            printCredentials();
 
-            Card adminCard = Card.builder()
-                    .cardNumber(encryptedCardNumber)
-                    .cardHolder("ADMIN USER")
-                    .expiryDate(LocalDate.now().plusYears(2))
-                    .balance(new BigDecimal("10000.00"))
-                    .status(Card.CardStatus.ACTIVE)
-                    .user(admin)
-                    .build();
-            cardRepository.save(adminCard);
-            log.info("Admin card created with number: **** **** **** 3456");
+        } catch (Exception e) {
+            log.error("Error during data initialization: {}", e.getMessage(), e);
+            // Не бросаем исключение дальше, чтобы приложение могло запуститься
+        }
+    }
+
+    private void initializeAdmin() {
+        if (userRepository.findByUsername("admin").isPresent()) {
+            return;
         }
 
-        // Создаем обычного пользователя
-        if (userRepository.findByUsername("user1").isEmpty()) {
-            User user = User.builder()
-                    .username("user1")
-                    .password(passwordEncoder.encode("user123"))
-                    .email("user1@bank.com")
-                    .role(User.Role.ROLE_USER)
-                    .build();
-            userRepository.save(user);
-            log.info("User created: user1/user123");
+        User admin = User.builder()
+                .username("admin")
+                .password(passwordEncoder.encode("Admin123!"))
+                .email("admin@bank.com")
+                .role(User.Role.ROLE_ADMIN)
+                .build();
 
-            // Создаем карту для пользователя
-            String encryptedCardNumber = encryptionService.encrypt("9876543210987654");
-            Card userCard = Card.builder()
-                    .cardNumber(encryptedCardNumber)
-                    .cardHolder("USER ONE")
-                    .expiryDate(LocalDate.now().plusYears(1))
-                    .balance(new BigDecimal("5000.00"))
-                    .status(Card.CardStatus.ACTIVE)
-                    .user(user)
-                    .build();
-            cardRepository.save(userCard);
-            log.info("User card created with number: **** **** **** 7654");
+        User savedAdmin = userRepository.save(admin);
+        createCardForUser(savedAdmin, "Admin Card", "4111111111111111",
+                LocalDate.now().plusYears(3), new BigDecimal("100000.00"));
+
+        log.info("✅ Admin user created: admin/Admin123!");
+    }
+
+    private void initializeUsers() {
+        String[][] users = {
+                {"john.doe", "john.doe@bank.com", "John's Primary Card", "4111111111111112"},
+                {"jane.smith", "jane.smith@bank.com", "Jane's Primary Card", "5111111111111111"},
+                {"mike.johnson", "mike.johnson@bank.com", "Mike's Business Card", "371111111111111"}
+        };
+
+        for (String[] userData : users) {
+            createUserIfNotExists(userData[0], "User123!", userData[1],
+                    User.Role.ROLE_USER, userData[2], userData[3]);
+        }
+    }
+
+    private void createUserIfNotExists(String username, String password, String email,
+                                       User.Role role, String cardName, String cardNumber) {
+        if (userRepository.findByUsername(username).isPresent()) {
+            return;
         }
 
-        log.info("Data initialization completed");
+        User user = User.builder()
+                .username(username)
+                .password(passwordEncoder.encode(password))
+                .email(email)
+                .role(role)
+                .build();
 
-        // Выводим информацию для доступа
-        log.info("=== Local Development Info ===");
-        log.info("H2 Console: http://localhost:8080/h2-console");
-        log.info("JDBC URL: jdbc:h2:mem:bankdb");
-        log.info("Username: sa");
-        log.info("Password: (empty)");
-        log.info("Swagger UI: http://localhost:8080/swagger-ui.html");
-        log.info("=== Available Users ===");
-        log.info("Admin: admin/admin123");
-        log.info("User: user1/user123");
-        log.info("==============================");
-        */
+        User savedUser = userRepository.save(user);
+        createCardForUser(savedUser, cardName, cardNumber,
+                LocalDate.now().plusYears(2), new BigDecimal("5000.00"));
+
+        log.info("✅ User created: {}/{}", username, password);
+    }
+
+    private void createCardForUser(User user, String cardHolder, String cardNumber,
+                                   LocalDate expiryDate, BigDecimal balance) {
+        String encryptedCardNumber = encryptionService.encrypt(cardNumber);
+
+        Card card = Card.builder()
+                .cardNumber(encryptedCardNumber)
+                .cardHolder(cardHolder.toUpperCase())
+                .expiryDate(expiryDate)
+                .balance(balance)
+                .status(Card.CardStatus.ACTIVE)
+                .user(user)
+                .blockRequested(false)
+                .build();
+
+        cardRepository.save(card);
+        log.debug("Card created for user: {}", user.getUsername());
+    }
+
+    private void printCredentials() {
+        log.info("""
+                
+                ==========================================
+                🏦 BANK CARD MANAGEMENT SYSTEM - LOCAL DEV
+                ==========================================
+                
+                📊 Application URL: http://localhost:8080
+                📚 API Documentation: http://localhost:8080/swagger-ui.html
+                📈 API Docs (JSON): http://localhost:8080/v3/api-docs
+                🏥 Health Check: http://localhost:8080/actuator/health
+                
+                ==========================================
+                👥 TEST CREDENTIALS
+                ==========================================
+                
+                👑 ADMINISTRATOR:
+                Username: admin
+                Password: Admin123!
+                
+                👤 REGULAR USERS:
+                Username: john.doe
+                Password: User123!
+                
+                Username: jane.smith
+                Password: User123!
+                
+                Username: mike.johnson
+                Password: User123!
+                
+                ==========================================
+                💾 DATABASE CONSOLE
+                ==========================================
+                
+                H2 Console: http://localhost:8080/h2-console
+                JDBC URL: jdbc:h2:mem:bankdb
+                Username: sa
+                Password: (empty)
+                
+                ==========================================
+                """);
     }
 }

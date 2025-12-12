@@ -20,6 +20,8 @@ public class MonitoringService {
         metrics.put("transfer.completed", new AtomicLong(0));
         metrics.put("card.block.requests", new AtomicLong(0));
         metrics.put("api.requests", new AtomicLong(0));
+        metrics.put("transactions.total", new AtomicLong(0));
+        metrics.put("errors.total", new AtomicLong(0));
     }
 
     public void recordSuccessfulLogin(String username) {
@@ -46,13 +48,21 @@ public class MonitoringService {
         metrics.get("api.requests").incrementAndGet();
     }
 
+    public void recordTransaction() {
+        metrics.get("transactions.total").incrementAndGet();
+    }
+
+    public void recordError() {
+        metrics.get("errors.total").incrementAndGet();
+    }
+
     public long getMetric(String metricName) {
         AtomicLong metric = metrics.get(metricName);
         return metric != null ? metric.get() : 0;
     }
 
     public ConcurrentHashMap<String, AtomicLong> getAllMetrics() {
-        return new ConcurrentHashMap<>(metrics);
+        return metrics;
     }
 
     public void recordSystemHealth() {

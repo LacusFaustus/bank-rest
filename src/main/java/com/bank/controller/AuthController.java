@@ -101,13 +101,15 @@ public class AuthController {
 
             String jwt = token.substring(7);
             if (tokenProvider.validateToken(jwt)) {
+                // Получаем имя пользователя из токена для логирования
+                String username = tokenProvider.getUsernameFromJWT(jwt);
                 auditService.logSecurityEvent("TOKEN_VALIDATION_SUCCESS",
-                        "Token is valid", true, request);
+                        "Token is valid for user: " + username, true, request);
                 return ResponseEntity.ok().body("Token is valid");
             }
 
             auditService.logSecurityEvent("TOKEN_VALIDATION_FAILED",
-                    "Invalid token", false, request);
+                    "Invalid or expired token", false, request);
             return ResponseEntity.badRequest().body("Invalid token");
         } catch (Exception e) {
             log.error("Error validating token", e);

@@ -3,17 +3,20 @@ package com.bank.controller;
 import com.bank.service.MonitoringService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/api/admin/monitoring")
-@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class MonitoringController {
 
@@ -21,33 +24,33 @@ public class MonitoringController {
 
     @GetMapping("/metrics")
     public ResponseEntity<Map<String, Long>> getMetrics() {
-        ConcurrentHashMap<String, Long> metrics = new ConcurrentHashMap<>();
-        monitoringService.getAllMetrics().forEach((key, value) -> metrics.put(key, value.get()));
+        ConcurrentHashMap<String, AtomicLong> metrics = monitoringService.getAllMetrics();
+        Map<String, Long> result = new HashMap<>();
 
-        return ResponseEntity.ok(metrics);
+        if (metrics != null) {
+            metrics.forEach((key, value) -> result.put(key, value.get()));
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> getHealth() {
-        Map<String, Object> health = Map.of(
-                "status", "UP",
-                "timestamp", System.currentTimeMillis(),
-                "memoryUsage", getMemoryUsage()
-        );
+        MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
+        long usedMemory = memoryBean.getHeapMemoryUsage().getUsed();
+        long maxMemory = memoryBean.getHeapMemoryUsage().getMax();
+        double usagePercent = maxMemory > 0 ? (double) usedMemory / maxMemory * 100 : 0;
 
-        return ResponseEntity.ok(health);
-    }
+        Map<String, Object> memoryUsage = new HashMap<>();
+        memoryUsage.put("usedMemoryMB", usedMemory / (1024 * 1024));
+        memoryUsage.put("maxMemoryMB", maxMemory / (1024 * 1024));
+        memoryUsage.put("usagePercent", String.format("%.2f%%", usagePercent));
 
-    private Map<String, Object> getMemoryUsage() {
-        Runtime runtime = Runtime.getRuntime();
-        long usedMemory = runtime.totalMemory() - runtime.freeMemory();
-        long maxMemory = runtime.maxMemory();
-        double memoryUsagePercent = (double) usedMemory / maxMemory * 100;
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "UP");
+        response.put("timestamp", Instant.now().toEpochMilli());
+        response.put("memoryUsage", memoryUsage);
 
-        return Map.of(
-                "usedMemoryMB", usedMemory / (1024 * 1024),
-                "maxMemoryMB", maxMemory / (1024 * 1024),
-                "usagePercent", String.format("%.2f%%", memoryUsagePercent)
-        );
+        return ResponseEntity.ok(response);
     }
 }

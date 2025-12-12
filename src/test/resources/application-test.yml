@@ -1,0 +1,70 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: ${DATASOURCE_URL:jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL}
+    driver-class-name: ${DATASOURCE_DRIVER:org.h2.Driver}
+    username: ${DATASOURCE_USERNAME:sa}
+    password: ${DATASOURCE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:create-drop}
+    properties:
+      hibernate:
+        dialect: ${JPA_DIALECT:org.hibernate.dialect.H2Dialect}
+        show_sql: ${JPA_SHOW_SQL:false}
+        format_sql: ${JPA_FORMAT_SQL:false}
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
+  liquibase:
+    enabled: false
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+
+  cache:
+    type: ${CACHE_TYPE:none}
+
+  test:
+    database:
+      replace: ${TEST_DATABASE_REPLACE:any}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:WARN}
+    com.bank: ${LOG_LEVEL_BANK:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE:WARN}
+    org.springframework.test: ${LOG_LEVEL_SPRING_TEST:WARN}
+    org.testcontainers: ${LOG_LEVEL_TESTCONTAINERS:INFO}
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:test-jwt-secret-base64-32-chars-long-12345678}
+    expiration: ${APP_JWT_EXPIRATION:3600000}
+  encryption:
+    key: ${APP_ENCRYPTION_KEY:test-encryption-key-base64-32-chars-long-12345678}
+  rate-limit:
+    enabled: ${APP_RATE_LIMIT_ENABLED:false}
+    login:
+      limit: ${RATE_LIMIT_LOGIN:10}
+      window-minutes: ${RATE_LIMIT_LOGIN_WINDOW:60}
+    api:
+      limit: ${RATE_LIMIT_API:100}
+      window-minutes: ${RATE_LIMIT_API_WINDOW:1}
+
+# Test containers configuration
+testcontainers:
+  reuse:
+    enable: true
+  containers:
+    reuse: true

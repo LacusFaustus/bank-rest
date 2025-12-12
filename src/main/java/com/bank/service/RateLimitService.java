@@ -1,121 +1,166 @@
 package com.bank.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RateLimitService {
 
-    private final CacheManager cacheManager;
+    @Value("${app.rate-limit.enabled:true}")
+    private boolean rateLimitEnabled;
 
-    private static final int MAX_REQUESTS_PER_MINUTE = 100;
-    private static final int MAX_LOGIN_ATTEMPTS_PER_HOUR = 5;
-    private static final int MAX_TRANSFERS_PER_DAY = 10;
+    // Константы лимитов
+    private static final int LOGIN_ATTEMPT_LIMIT = 10;
+    private static final int LOGIN_ATTEMPT_WINDOW_SECONDS = 60;
+    private static final int TRANSFER_LIMIT = 5;
+    private static final int TRANSFER_WINDOW_SECONDS = 60;
+    private static final int CARD_BLOCK_LIMIT = 3;
+    private static final int CARD_BLOCK_WINDOW_SECONDS = 3600;
+    private static final int API_REQUEST_LIMIT = 100;
+    private static final int API_REQUEST_WINDOW_SECONDS = 60;
+
+    public enum RateLimitType {
+        LOGIN_ATTEMPT,
+        TRANSFER_OPERATION,
+        CARD_BLOCK,
+        API_REQUEST
+    }
+
+    private static class RequestCounter {
+        private final AtomicInteger count = new AtomicInteger(0);
+        private Instant windowStart;
+
+        RequestCounter() {
+            this.windowStart = Instant.now();
+        }
+
+        void increment() {
+            count.incrementAndGet();
+        }
+
+        boolean isExpired(int windowSeconds) {
+            return Instant.now().minusSeconds(windowSeconds).isAfter(windowStart);
+        }
+
+        void resetIfExpired(int windowSeconds) {
+            if (isExpired(windowSeconds)) {
+                count.set(0);
+                windowStart = Instant.now();
+            }
+        }
+
+        int getCount() {
+            return count.get();
+        }
+
+        // Метод для проверки и инкремента в одном атомарном действии
+        boolean tryIncrement(int limit, int windowSeconds) {
+            resetIfExpired(windowSeconds);
+
+            // Атомарно проверяем и инкрементируем
+            while (true) {
+                int current = count.get();
+                if (current >= limit) {
+                    return false; // Лимит превышен
+                }
+                if (count.compareAndSet(current, current + 1)) {
+                    return true; // Успешно инкрементировали
+                }
+                // CAS неудачен, пробуем снова
+            }
+        }
+    }
+
+    private final Map<String, RequestCounter> loginAttemptCounters = new ConcurrentHashMap<>();
+    private final Map<String, RequestCounter> transferCounters = new ConcurrentHashMap<>();
+    private final Map<String, RequestCounter> cardBlockCounters = new ConcurrentHashMap<>();
+    private final Map<String, RequestCounter> apiRequestCounters = new ConcurrentHashMap<>();
 
     public boolean isRateLimited(String key, RateLimitType type) {
-        String cacheKey = type + "_" + key;
-        Cache cache = cacheManager.getCache("rateLimit");
-
-        if (cache == null) {
+        if (!rateLimitEnabled || key == null) {
             return false;
         }
 
-        RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);
-        if (rateLimitInfo == null) {
-            rateLimitInfo = new RateLimitInfo();
-            cache.put(cacheKey, rateLimitInfo);
+        Map<String, RequestCounter> counters = getCountersMap(type);
+        RequestCounter counter = counters.get(key);
+
+        if (counter == null) {
+            return false; // Нет записей - не ограничен
         }
 
-        return rateLimitInfo.isRateLimited(type);
+        int windowSeconds = getWindowSeconds(type);
+        int limit = getLimit(type);
+
+        counter.resetIfExpired(windowSeconds);
+        return counter.getCount() >= limit;
     }
 
+    public boolean tryRecordRequest(String key, RateLimitType type) {
+        if (!rateLimitEnabled || key == null) {
+            return true; // Всегда успешно, если ограничения выключены
+        }
+
+        Map<String, RequestCounter> counters = getCountersMap(type);
+        int windowSeconds = getWindowSeconds(type);
+        int limit = getLimit(type);
+
+        RequestCounter counter = counters.computeIfAbsent(key, k -> new RequestCounter());
+        return counter.tryIncrement(limit, windowSeconds);
+    }
+
+    // Старый метод для обратной совместимости
     public void recordRequest(String key, RateLimitType type) {
-        String cacheKey = type + "_" + key;
-        Cache cache = cacheManager.getCache("rateLimit");
-
-        if (cache == null) {
-            return;
-        }
-
-        RateLimitInfo rateLimitInfo = cache.get(cacheKey, RateLimitInfo.class);
-        if (rateLimitInfo == null) {
-            rateLimitInfo = new RateLimitInfo();
-        }
-
-        rateLimitInfo.recordRequest(type);
-        cache.put(cacheKey, rateLimitInfo);
+        tryRecordRequest(key, type);
     }
 
-    public enum RateLimitType {
-        API_REQUEST,
-        LOGIN_ATTEMPT,
-        TRANSFER_OPERATION
+    private Map<String, RequestCounter> getCountersMap(RateLimitType type) {
+        return switch (type) {
+            case LOGIN_ATTEMPT -> loginAttemptCounters;
+            case TRANSFER_OPERATION -> transferCounters;
+            case CARD_BLOCK -> cardBlockCounters;
+            case API_REQUEST -> apiRequestCounters;
+        };
     }
 
-    private static class RateLimitInfo {
-        private final AtomicInteger requestsLastMinute = new AtomicInteger(0);
-        private final AtomicInteger loginAttemptsLastHour = new AtomicInteger(0);
-        private final AtomicInteger transfersLastDay = new AtomicInteger(0);
-        private LocalDateTime minuteWindowStart = LocalDateTime.now();
-        private LocalDateTime hourWindowStart = LocalDateTime.now();
-        private LocalDateTime dayWindowStart = LocalDateTime.now();
+    private int getLimit(RateLimitType type) {
+        return switch (type) {
+            case LOGIN_ATTEMPT -> LOGIN_ATTEMPT_LIMIT;
+            case TRANSFER_OPERATION -> TRANSFER_LIMIT;
+            case CARD_BLOCK -> CARD_BLOCK_LIMIT;
+            case API_REQUEST -> API_REQUEST_LIMIT;
+        };
+    }
 
-        public synchronized boolean isRateLimited(RateLimitType type) {
-            resetCountersIfNeeded();
+    private int getWindowSeconds(RateLimitType type) {
+        return switch (type) {
+            case LOGIN_ATTEMPT -> LOGIN_ATTEMPT_WINDOW_SECONDS;
+            case TRANSFER_OPERATION -> TRANSFER_WINDOW_SECONDS;
+            case CARD_BLOCK -> CARD_BLOCK_WINDOW_SECONDS;
+            case API_REQUEST -> API_REQUEST_WINDOW_SECONDS;
+        };
+    }
 
-            switch (type) {
-                case API_REQUEST:
-                    return requestsLastMinute.get() >= MAX_REQUESTS_PER_MINUTE;
-                case LOGIN_ATTEMPT:
-                    return loginAttemptsLastHour.get() >= MAX_LOGIN_ATTEMPTS_PER_HOUR;
-                case TRANSFER_OPERATION:
-                    return transfersLastDay.get() >= MAX_TRANSFERS_PER_DAY;
-                default:
-                    return false;
-            }
-        }
+    @Scheduled(fixedRate = 60000)
+    public void cleanupExpiredCounters() {
+        if (!rateLimitEnabled) return;
 
-        public synchronized void recordRequest(RateLimitType type) {
-            resetCountersIfNeeded();
+        cleanupMap(loginAttemptCounters, LOGIN_ATTEMPT_WINDOW_SECONDS);
+        cleanupMap(transferCounters, TRANSFER_WINDOW_SECONDS);
+        cleanupMap(cardBlockCounters, CARD_BLOCK_WINDOW_SECONDS);
+        cleanupMap(apiRequestCounters, API_REQUEST_WINDOW_SECONDS);
+    }
 
-            switch (type) {
-                case API_REQUEST:
-                    requestsLastMinute.incrementAndGet();
-                    break;
-                case LOGIN_ATTEMPT:
-                    loginAttemptsLastHour.incrementAndGet();
-                    break;
-                case TRANSFER_OPERATION:
-                    transfersLastDay.incrementAndGet();
-                    break;
-            }
-        }
-
-        private void resetCountersIfNeeded() {
-            LocalDateTime now = LocalDateTime.now();
-
-            if (now.minusMinutes(1).isAfter(minuteWindowStart)) {
-                requestsLastMinute.set(0);
-                minuteWindowStart = now;
-            }
-
-            if (now.minusHours(1).isAfter(hourWindowStart)) {
-                loginAttemptsLastHour.set(0);
-                hourWindowStart = now;
-            }
-
-            if (now.minusDays(1).isAfter(dayWindowStart)) {
-                transfersLastDay.set(0);
-                dayWindowStart = now;
-            }
-        }
+    private void cleanupMap(Map<String, RequestCounter> counters, int windowSeconds) {
+        counters.entrySet().removeIf(entry ->
+                entry.getValue().isExpired(windowSeconds)
+        );
     }
 }

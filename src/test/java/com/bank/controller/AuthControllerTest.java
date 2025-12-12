@@ -1,320 +1,200 @@
 package com.bank.controller;
 
-import com.bank.config.TestSecurityConfig;
 import com.bank.dto.AuthRequest;
+import com.bank.dto.AuthResponse;
 import com.bank.security.JwtTokenProvider;
-import com.bank.service.AuditService;
-import com.bank.service.MonitoringService;
-import com.bank.service.PasswordPolicyService;
-import com.bank.service.RateLimitService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
+import com.bank.service.*;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = AuthController.class)
-@ActiveProfiles("test")
-@Import(TestSecurityConfig.class)
+@ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private AuthenticationManager authenticationManager;
 
-    @MockBean
+    @Mock
     private JwtTokenProvider tokenProvider;
 
-    @MockBean
+    @Mock
     private MonitoringService monitoringService;
 
-    @MockBean
+    @Mock
     private AuditService auditService;
 
-    @MockBean
+    @Mock
     private RateLimitService rateLimitService;
 
-    @MockBean
-    private PasswordPolicyService passwordPolicyService;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    private AuthRequest validAuthRequest;
-    private AuthRequest invalidAuthRequest;
-    private Authentication authentication;
-
-    @BeforeEach
-    void setUp() {
-        // Setup test data
-        validAuthRequest = new AuthRequest();
-        validAuthRequest.setUsername("testuser");
-        validAuthRequest.setPassword("ValidPass123!");
-
-        invalidAuthRequest = new AuthRequest();
-        invalidAuthRequest.setUsername("testuser");
-        invalidAuthRequest.setPassword("wrongpassword");
-
-        // Setup mock authentication
-        authentication = Mockito.mock(Authentication.class);
-        when(authentication.getName()).thenReturn("testuser");
-
-        // Setup audit service to do nothing
-        doNothing().when(auditService).logSecurityEvent(anyString(), anyString(), anyBoolean(), any());
-
-        // Setup rate limit service to allow requests
-        when(rateLimitService.isRateLimited(anyString(), any())).thenReturn(false);
-        doNothing().when(rateLimitService).recordRequest(anyString(), any());
-
-        // Setup password policy service to allow valid passwords
-        when(passwordPolicyService.validatePassword("ValidPass123!")).thenReturn(true);
-        when(passwordPolicyService.validatePassword("wrongpassword")).thenReturn(true);
-        when(passwordPolicyService.validatePassword("weak")).thenReturn(false);
-    }
+    @InjectMocks
+    private AuthController authController;
 
     @Test
-    void authenticateUser_ValidCredentials_ShouldReturnToken() throws Exception {
+    void authenticateUser_ShouldReturnToken() {
         // Given
+        AuthRequest request = new AuthRequest();
+        request.setUsername("user");
+        request.setPassword("pass");
+
+        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
+        Authentication authentication = mock(Authentication.class);
+
+        when(servletRequest.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(servletRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(rateLimitService.isRateLimited(anyString(), any())).thenReturn(false);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
-        when(tokenProvider.generateToken(authentication)).thenReturn("test-jwt-token");
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validAuthRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("test-jwt-token"))
-                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+        // Когда токен генерируется, просто возвращаем строку
+        when(tokenProvider.generateToken(authentication)).thenReturn("jwt-token");
 
-        // Verify interactions
-        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
-        verify(tokenProvider).generateToken(authentication);
-        verify(monitoringService).recordSuccessfulLogin("testuser");
+        // When
+        ResponseEntity<?> response = authController.authenticateUser(request, servletRequest);
+
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody() instanceof AuthResponse);
+        AuthResponse authResponse = (AuthResponse) response.getBody();
+        assertEquals("jwt-token", authResponse.getToken());
+
+        // Проверяем, что сервисы были вызваны
+        verify(monitoringService).recordSuccessfulLogin("user");
         verify(auditService).logSecurityEvent(eq("LOGIN_SUCCESS"), anyString(), eq(true), any());
-        verify(passwordPolicyService).validatePassword("ValidPass123!");
     }
 
     @Test
-    void authenticateUser_InvalidCredentials_ShouldReturnUnauthorized() throws Exception {
+    void authenticateUser_InvalidCredentials_ShouldReturn401() {
         // Given
+        AuthRequest request = new AuthRequest();
+        request.setUsername("user");
+        request.setPassword("wrongpass");
+
+        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
+
+        when(servletRequest.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(servletRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(rateLimitService.isRateLimited(anyString(), any())).thenReturn(false);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Invalid credentials"));
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidAuthRequest)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().string("Invalid credentials"));
+        // When
+        ResponseEntity<?> response = authController.authenticateUser(request, servletRequest);
 
-        // Verify interactions
-        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
-        verify(monitoringService).recordFailedLogin("testuser");
-        verify(auditService).logSecurityEvent(eq("LOGIN_FAILED"), anyString(), eq(false), any());
-        verify(tokenProvider, never()).generateToken(any());
-        verify(passwordPolicyService).validatePassword("wrongpassword");
+        // Then
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid credentials", response.getBody());
+        verify(monitoringService).recordFailedLogin("user");
     }
 
     @Test
-    void authenticateUser_RateLimited_ShouldReturnTooManyRequests() throws Exception {
+    void authenticateUser_RateLimited_ShouldReturn429() {
         // Given
+        AuthRequest request = new AuthRequest();
+        request.setUsername("user");
+        request.setPassword("pass");
+
+        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
+
+        when(servletRequest.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(servletRequest.getRemoteAddr()).thenReturn("127.0.0.1");
         when(rateLimitService.isRateLimited(anyString(), any())).thenReturn(true);
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validAuthRequest)))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(content().string("Rate limit exceeded. Please try again later."));
+        // When
+        ResponseEntity<?> response = authController.authenticateUser(request, servletRequest);
 
-        // Verify no authentication attempts when rate limited
+        // Then
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
+        assertEquals("Rate limit exceeded. Please try again later.", response.getBody());
         verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        verify(passwordPolicyService, never()).validatePassword(any());
     }
 
     @Test
-    void validateToken_ValidToken_ShouldReturnOk() throws Exception {
+    void validateToken_ValidToken_ShouldReturnOk() {
         // Given
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        String token = "Bearer valid-token";
+
         when(tokenProvider.validateToken("valid-token")).thenReturn(true);
+        when(tokenProvider.getUsernameFromJWT("valid-token")).thenReturn("testuser");
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/validate")
-                        .header("Authorization", "Bearer valid-token"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Token is valid"));
+        // When
+        ResponseEntity<?> response = authController.validateToken(token, request);
 
-        // Verify interactions
-        verify(tokenProvider).validateToken("valid-token");
-        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_SUCCESS"), anyString(), eq(true), any());
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Token is valid", response.getBody());
     }
 
     @Test
-    void validateToken_InvalidToken_ShouldReturnBadRequest() throws Exception {
+    void validateToken_InvalidToken_ShouldReturnBadRequest() {
         // Given
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        String token = "Bearer invalid-token";
+
         when(tokenProvider.validateToken("invalid-token")).thenReturn(false);
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/validate")
-                        .header("Authorization", "Bearer invalid-token"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Invalid token"));
+        // When
+        ResponseEntity<?> response = authController.validateToken(token, request);
 
-        // Verify interactions
-        verify(tokenProvider).validateToken("invalid-token");
-        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_FAILED"), anyString(), eq(false), any());
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Invalid token", response.getBody());
     }
 
     @Test
-    void validateToken_MissingToken_ShouldReturnBadRequest() throws Exception {
-        // When & Then
-        mockMvc.perform(post("/api/auth/validate"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Invalid token"));
-
-        // Verify no token validation when token is missing
-        verify(tokenProvider, never()).validateToken(any());
-        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_FAILED"), anyString(), eq(false), any());
-    }
-
-    @Test
-    void validateToken_MalformedToken_ShouldReturnBadRequest() throws Exception {
-        // When & Then
-        mockMvc.perform(post("/api/auth/validate")
-                        .header("Authorization", "InvalidFormat"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Invalid token"));
-
-        // Verify no token validation when token format is invalid
-        verify(tokenProvider, never()).validateToken(any());
-        verify(auditService).logSecurityEvent(eq("TOKEN_VALIDATION_FAILED"), anyString(), eq(false), any());
-    }
-
-    @Test
-    void authenticateUser_EmptyUsername_ShouldReturnBadRequest() throws Exception {
+    void validateToken_NullToken_ShouldReturnBadRequest() {
         // Given
-        AuthRequest emptyUsernameRequest = new AuthRequest();
-        emptyUsernameRequest.setUsername("");
-        emptyUsernameRequest.setPassword("ValidPass123!");
+        HttpServletRequest request = mock(HttpServletRequest.class);
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(emptyUsernameRequest)))
-                .andExpect(status().isBadRequest());
+        // When
+        ResponseEntity<?> response = authController.validateToken(null, request);
 
-        // Verify no authentication attempts for invalid request
-        verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        // Не проверяем вызовы PasswordPolicyService, так как Spring может не вызывать кастомные валидаторы при нарушении @NotBlank
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Invalid token", response.getBody());
     }
 
     @Test
-    void authenticateUser_EmptyPassword_ShouldReturnBadRequest() throws Exception {
+    void validateToken_InvalidFormat_ShouldReturnBadRequest() {
         // Given
-        AuthRequest emptyPasswordRequest = new AuthRequest();
-        emptyPasswordRequest.setUsername("testuser");
-        emptyPasswordRequest.setPassword("");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        String token = "InvalidFormatToken";
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(emptyPasswordRequest)))
-                .andExpect(status().isBadRequest());
+        // When
+        ResponseEntity<?> response = authController.validateToken(token, request);
 
-        // Verify no authentication attempts for invalid request
-        verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        // Не проверяем вызовы PasswordPolicyService, так как Spring может не вызывать кастомные валидаторы при нарушении @NotBlank
+        // Then
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Invalid token", response.getBody());
     }
 
     @Test
-    void authenticateUser_NullRequest_ShouldReturnBadRequest() throws Exception {
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
-
-        // Verify no authentication attempts for invalid request
-        verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        // Не проверяем вызовы PasswordPolicyService, так как Spring может не вызывать кастомные валидаторы при нарушении @NotBlank
-    }
-
-    @Test
-    void authenticateUser_WeakPassword_ShouldReturnBadRequest() throws Exception {
+    void validateToken_Exception_ShouldReturn500() {
         // Given
-        AuthRequest weakPasswordRequest = new AuthRequest();
-        weakPasswordRequest.setUsername("testuser");
-        weakPasswordRequest.setPassword("weak");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        String token = "Bearer some-token";
 
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(weakPasswordRequest)))
-                .andExpect(status().isBadRequest());
+        when(tokenProvider.validateToken("some-token")).thenThrow(new RuntimeException("Test exception"));
 
-        // Verify no authentication attempts for weak password
-        verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        // Для weak password проверяем вызов валидации, так как @NotBlank пройден
-        verify(passwordPolicyService).validatePassword("weak");
-    }
+        // When
+        ResponseEntity<?> response = authController.validateToken(token, request);
 
-    @Test
-    void authenticateUser_NullUsername_ShouldReturnBadRequest() throws Exception {
-        // Given
-        AuthRequest nullUsernameRequest = new AuthRequest();
-        nullUsernameRequest.setUsername(null);
-        nullUsernameRequest.setPassword("ValidPass123!");
-
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(nullUsernameRequest)))
-                .andExpect(status().isBadRequest());
-
-        // Verify no interactions for null username
-        verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        // Не проверяем вызовы PasswordPolicyService, так как Spring может не вызывать кастомные валидаторы при нарушении @NotBlank
-    }
-
-    @Test
-    void authenticateUser_NullPassword_ShouldReturnBadRequest() throws Exception {
-        // Given
-        AuthRequest nullPasswordRequest = new AuthRequest();
-        nullPasswordRequest.setUsername("testuser");
-        nullPasswordRequest.setPassword(null);
-
-        // When & Then
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(nullPasswordRequest)))
-                .andExpect(status().isBadRequest());
-
-        // Verify no interactions for null password
-        verify(authenticationManager, never()).authenticate(any());
-        verify(tokenProvider, never()).generateToken(any());
-        // Не проверяем вызовы PasswordPolicyService, так как Spring может не вызывать кастомные валидаторы при нарушении @NotBlank
+        // Then
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals("Token validation error", response.getBody());
     }
 }

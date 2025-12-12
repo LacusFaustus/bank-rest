@@ -5,9 +5,11 @@ import com.bank.entity.User;
 import com.bank.exception.CardNotFoundException;
 import com.bank.exception.UnauthorizedAccessException;
 import com.bank.repository.CardRepository;
+import com.bank.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,16 +32,13 @@ class CardServiceTest {
     private EncryptionService encryptionService;
 
     @Mock
-    private TransactionService transactionService;
-
-    @Mock
-    private MonitoringService monitoringService;
-
-    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
 
     private CardService cardService;
 
@@ -49,8 +48,9 @@ class CardServiceTest {
 
     @BeforeEach
     void setUp() {
-        cardService = new CardService(cardRepository, encryptionService, transactionService,
-                monitoringService, eventPublisher, auditService);
+        // Используем конструктор, который создаст Spring
+        cardService = new CardService(cardRepository, encryptionService,
+                null, eventPublisher, auditService);
 
         testUser = User.builder()
                 .id(1L)
@@ -150,6 +150,27 @@ class CardServiceTest {
 
         // When
         String masked = cardService.getMaskedCardNumber("invalid-encrypted");
+
+        // Then
+        assertEquals("**** **** **** ****", masked);
+    }
+
+    @Test
+    void getMaskedCardNumber_NullInput_ShouldReturnDefault() {
+        // When
+        String masked = cardService.getMaskedCardNumber(null);
+
+        // Then
+        assertEquals("**** **** **** ****", masked);
+    }
+
+    @Test
+    void getMaskedCardNumber_ShortCardNumber_ShouldReturnDefault() {
+        // Given
+        when(encryptionService.decrypt("short")).thenReturn("123");
+
+        // When
+        String masked = cardService.getMaskedCardNumber("short");
 
         // Then
         assertEquals("**** **** **** ****", masked);

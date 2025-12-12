@@ -2,10 +2,8 @@ package com.bank.controller;
 
 import com.bank.dto.PaginatedResponse;
 import com.bank.entity.AuditLog;
-import com.bank.repository.AuditLogRepository;
+import com.bank.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,7 +17,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuditController {
 
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
 
     @GetMapping
     public ResponseEntity<PaginatedResponse<AuditLog>> getAuditLogs(
@@ -34,10 +32,10 @@ public class AuditController {
         if (startDate == null) startDate = LocalDateTime.now().minusDays(7);
         if (endDate == null) endDate = LocalDateTime.now();
 
-        Page<AuditLog> auditLogs = auditLogRepository.findWithFilters(
-                username, actionType, success, startDate, endDate, PageRequest.of(page, size));
+        PaginatedResponse<AuditLog> auditLogs = auditLogService.getAuditLogsWithFilters(
+                username, actionType, success, startDate, endDate, page, size);
 
-        return ResponseEntity.ok(PaginatedResponse.of(auditLogs));
+        return ResponseEntity.ok(auditLogs);
     }
 
     @GetMapping("/user/{username}")
@@ -46,9 +44,9 @@ public class AuditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        Page<AuditLog> auditLogs = auditLogRepository.findByUsername(
-                username, PageRequest.of(page, size));
+        PaginatedResponse<AuditLog> auditLogs = auditLogService.getUserAuditLogs(
+                username, page, size);
 
-        return ResponseEntity.ok(PaginatedResponse.of(auditLogs));
+        return ResponseEntity.ok(auditLogs);
     }
 }

@@ -15,6 +15,8 @@ import java.util.Optional;
 
 @Repository
 public interface CardRepository extends JpaRepository<Card, Long> {
+
+    // Existing methods
     Page<Card> findByUser(User user, Pageable pageable);
 
     @Query("SELECT c FROM Card c WHERE c.user = :user AND " +
@@ -31,8 +33,6 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     @Query("SELECT c FROM Card c WHERE c.user = :user AND c.status = 'ACTIVE' AND c.expiryDate > CURRENT_DATE")
     List<Card> findActiveUserCards(User user);
 
-    Page<Card> findAll(Pageable pageable);
-
     Optional<Card> findByIdAndUser(Long id, User user);
 
     boolean existsByCardNumber(String cardNumber);
@@ -42,7 +42,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     List<Card> findByBlockRequestedTrue();
 
-    // Упрощенная версия фильтрации - убираем сложный boolean expression
+    // Add this method for AdminController
     @Query("SELECT c FROM Card c WHERE " +
             "(:status IS NULL OR c.status = :status) AND " +
             "(:userId IS NULL OR c.user.id = :userId)")
@@ -50,19 +50,17 @@ public interface CardRepository extends JpaRepository<Card, Long> {
                                @Param("userId") Long userId,
                                Pageable pageable);
 
-    // Отдельный метод для поиска просроченных карт
+    // Add this method for expired cards
     @Query("SELECT c FROM Card c WHERE c.expiryDate < CURRENT_DATE")
     Page<Card> findExpiredCards(Pageable pageable);
 
-    // Отдельный метод для поиска активных не просроченных карт
+    // Add this method for active non-expired cards
     @Query("SELECT c FROM Card c WHERE c.expiryDate >= CURRENT_DATE AND c.status = 'ACTIVE'")
     Page<Card> findActiveNonExpiredCards(Pageable pageable);
 
     @Query("SELECT COUNT(c) FROM Card c WHERE c.user.id = :userId AND c.status = 'ACTIVE'")
     long countActiveCardsByUserId(@Param("userId") Long userId);
 
-    // Упрощенный метод для поиска по имени держателя карты
-    default Page<Card> findByUserAndCardHolderContainingIgnoreCase(User user, String search, Pageable pageable) {
-        return findByUserAndSearch(user, search, pageable);
-    }
+    @Query("SELECT COUNT(c) FROM Card c WHERE c.user.id = :userId")
+    long countByUserId(@Param("userId") Long userId);
 }
