@@ -1,89 +1,73 @@
 package com.bank.service;
 
-import com.bank.entity.AuditLog;
-import com.bank.repository.AuditLogRepository;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuditService {
 
-    private final AuditLogRepository auditLogRepository;
+    // Существующие методы
+    public void logSecurityEvent(String eventType, String description, boolean success, HttpServletRequest request) {
+        logEvent("SECURITY", eventType, description, success, null, null, request);
+    }
 
-    @Transactional
-    public void logActivity(String actionType, String description, boolean success,
-                            String resourceId, String requestDetails, HttpServletRequest request) {
+    public void logTransactionEvent(String eventType, String description, double amount,
+                                    String fromAccount, String toAccount, HttpServletRequest request) {
+        logEvent("TRANSACTION", eventType, description, true, fromAccount, toAccount, request);
+    }
 
-        String username = getCurrentUsername();
-        String ipAddress = getClientIp(request);
-        String userAgent = request != null ? request.getHeader("User-Agent") : null;
+    // Новый универсальный метод для обратной совместимости
+    public void logActivity(String eventType, String description, boolean success,
+                            String fromAccount, String toAccount, HttpServletRequest request) {
+        logEvent("ACTIVITY", eventType, description, success, fromAccount, toAccount, request);
+    }
 
-        AuditLog auditLog = AuditLog.builder()
-                .actionType(actionType)
-                .description(description)
-                .username(username)
-                .ipAddress(ipAddress)
-                .userAgent(userAgent)
-                .success(success)
-                .resourceId(resourceId)
-                .requestDetails(requestDetails)
-                .timestamp(LocalDateTime.now())
-                .build();
-
+    private void logEvent(String logType, String eventType, String description, boolean success,
+                          String fromAccount, String toAccount, HttpServletRequest request) {
         try {
-            auditLogRepository.save(auditLog);
-            log.debug("Audit log saved: {} - {}", actionType, description);
+            String clientIp = getClientIp(request);
+            String userAgent = getUserAgent(request);
+
+            String maskedFrom = maskAccountNumber(fromAccount);
+            String maskedTo = maskAccountNumber(toAccount);
+
+            log.info("[{} AUDIT] Event: {}, Success: {}, From: {}, To: {}, IP: {}, User-Agent: {}, Description: {}, Time: {}",
+                    logType, eventType, success, maskedFrom, maskedTo, clientIp, userAgent,
+                    description, LocalDateTime.now());
+
         } catch (Exception e) {
-            log.error("Failed to save audit log: {}", e.getMessage());
-        }
-    }
-
-    public void logSecurityEvent(String actionType, String description, boolean success,
-                                 HttpServletRequest request) {
-        logActivity(actionType, description, success, null, null, request);
-    }
-
-    public void logTransferActivity(Long fromCardId, Long toCardId, BigDecimal amount,
-                                    boolean success, String errorMessage, HttpServletRequest request) {
-        String description = String.format("Transfer %.2f from card %d to card %d",
-                amount, fromCardId, toCardId);
-        String requestDetails = String.format("{\"fromCardId\": %d, \"toCardId\": %d, \"amount\": %.2f}",
-                fromCardId, toCardId, amount);
-
-        logActivity("TRANSFER", description, success, fromCardId.toString(),
-                requestDetails, request);
-
-        if (!success && errorMessage != null) {
-            // Дополнительный лог для ошибок
-            logActivity("TRANSFER_ERROR", errorMessage, false, fromCardId.toString(),
-                    requestDetails, request);
-        }
-    }
-
-    private String getCurrentUsername() {
-        try {
-            return SecurityContextHolder.getContext().getAuthentication().getName();
-        } catch (Exception e) {
-            return "SYSTEM";
+            log.error("Error logging {} event", logType.toLowerCase(), e);
         }
     }
 
     private String getClientIp(HttpServletRequest request) {
-        if (request == null) return "unknown";
+        if (request == null) {
+            return "unknown";
+        }
 
         String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader != null) {
-            return xfHeader.split(",")[0];
+        if (xfHeader != null && !xfHeader.isEmpty()) {
+            return xfHeader.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private String getUserAgent(HttpServletRequest request) {
+        if (request == null) {
+            return "unknown";
+        }
+        String userAgent = request.getHeader("User-Agent");
+        return userAgent != null ? userAgent : "unknown";
+    }
+
+    private String maskAccountNumber(String accountNumber) {
+        if (accountNumber == null || accountNumber.length() < 8) {
+            return "****";
+        }
+        return accountNumber.substring(0, 4) + "****" + accountNumber.substring(accountNumber.length() - 4);
     }
 }

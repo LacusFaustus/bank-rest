@@ -1,12 +1,14 @@
 package com.bank.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
 
-@Getter
+@Data
 @AllArgsConstructor
+@EqualsAndHashCode
 public class ErrorResponse {
     private LocalDateTime timestamp;
     private int status;

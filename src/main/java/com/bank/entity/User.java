@@ -10,7 +10,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 
 @Entity
 @Table(name = "users")
@@ -20,18 +19,22 @@ import java.util.Objects;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = "password")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // Явно указываем поля для equals/hashCode
 public class User implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include // Включаем id в equals/hashCode
     private Long id;
 
     @Column(unique = true, nullable = false, length = 50)
+    @EqualsAndHashCode.Include // Включаем username в equals/hashCode
     private String username;
 
     @Column(nullable = false)
     private String password;
 
     @Column(unique = true, nullable = false, length = 100)
+    @EqualsAndHashCode.Include // Включаем email в equals/hashCode
     private String email;
 
     @Enumerated(EnumType.STRING)
@@ -69,20 +72,5 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
         return true;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        User user = (User) o;
-        return Objects.equals(id, user.id) &&
-                Objects.equals(username, user.username) &&
-                Objects.equals(email, user.email);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, username, email);
     }
 }

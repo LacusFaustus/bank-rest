@@ -1,50 +1,41 @@
 spring:
-  main:
-    banner-mode: off
-    allow-bean-definition-overriding: true
+  config:
+    activate:
+      on-profile: test
+
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
     driver-class-name: org.h2.Driver
     username: sa
     password: ''
+
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: false
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
         show_sql: false
         format_sql: false
-  h2:
-    console:
-      enabled: false
+    generate-ddl: true
+
   liquibase:
     enabled: false
-  security:
-    user:
-      name: testuser
-      password: testpass
+    change-log: classpath:/db/changelog/db.changelog-master.xml
 
-jwt:
-  secret: test-jwt-secret-key-very-long-for-testing-1234567890
-  expiration: 3600000
-
-app:
-  encryption:
-    key: test-encryption-key-32-chars-long-1234567890
+  cache:
+    type: none
 
 logging:
-  config: classpath:logback-spring.xml
   level:
     root: WARN
-    com.bank: DEBUG
-    org.springframework.security: WARN
+    com.bank: INFO
+    org.hibernate.SQL: WARN
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-  endpoint:
-    health:
-      enabled: false
+app:
+  jwt:
+    secret: test-jwt-secret-for-testing-32-chars-minimum
+  encryption:
+    key: test-encryption-key-for-testing-32-chars-min
+  rate-limit:
+    enabled: false

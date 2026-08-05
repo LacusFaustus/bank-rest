@@ -15,6 +15,7 @@ public class PasswordPolicyService {
     private static final Pattern LOWERCASE_PATTERN = Pattern.compile("[a-z]");
     private static final Pattern DIGIT_PATTERN = Pattern.compile("[0-9]");
     private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile("[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]");
+    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s");
 
     public boolean validatePassword(String password) {
         if (password == null) {
@@ -22,7 +23,6 @@ public class PasswordPolicyService {
             return false;
         }
 
-        // Для пустых строк сразу возвращаем false без подробного логирования
         if (password.isEmpty()) {
             log.debug("Password is empty - validation failed");
             return false;
@@ -34,6 +34,12 @@ public class PasswordPolicyService {
             return false;
         }
 
+        // Проверяем на наличие пробелов
+        if (WHITESPACE_PATTERN.matcher(password).find()) {
+            log.debug("Password contains whitespace - validation failed");
+            return false;
+        }
+
         boolean hasUppercase = UPPERCASE_PATTERN.matcher(password).find();
         boolean hasLowercase = LOWERCASE_PATTERN.matcher(password).find();
         boolean hasDigit = DIGIT_PATTERN.matcher(password).find();
@@ -42,29 +48,33 @@ public class PasswordPolicyService {
         log.debug("Password validation - Uppercase: {}, Lowercase: {}, Digit: {}, Special: {}",
                 hasUppercase, hasLowercase, hasDigit, hasSpecialChar);
 
+        // Обязательные требования:
+        // 1. Должна быть хотя бы одна заглавная буква
+        // 2. Должна быть хотя бы одна строчная буква
+        // 3. Должна быть хотя бы одна цифра ИЛИ хотя бы один специальный символ
         if (!hasUppercase) {
             log.debug("Password must contain at least one uppercase letter");
             return false;
         }
 
-        int additionalRequirementsMet = 0;
-        if (hasLowercase) additionalRequirementsMet++;
-        if (hasDigit) additionalRequirementsMet++;
-        if (hasSpecialChar) additionalRequirementsMet++;
-
-        // Требуем минимум одну дополнительную категорию (строчные буквы, цифры или специальные символы)
-        boolean isValid = additionalRequirementsMet >= 1;
-
-        if (!isValid) {
-            log.debug("Password complexity requirements not met. Required: uppercase + 1 additional category, Actual additional: {}", additionalRequirementsMet);
+        if (!hasLowercase) {
+            log.debug("Password must contain at least one lowercase letter");
+            return false;
         }
 
-        return isValid;
+        // Требуется хотя бы одно из: цифры ИЛИ специальные символы
+        boolean hasDigitOrSpecial = hasDigit || hasSpecialChar;
+        if (!hasDigitOrSpecial) {
+            log.debug("Password must contain at least one digit or special character");
+            return false;
+        }
+
+        return true;
     }
 
     public String generatePasswordRequirementsMessage() {
         return String.format(
-                "Password must be between %d and %d characters long and contain: at least one uppercase letter, and at least one of the following: lowercase letters, numbers, special characters",
+                "Password must be between %d and %d characters long, contain no whitespace, and contain: at least one uppercase letter, at least one lowercase letter, and at least one digit or special character",
                 MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH
         );
     }

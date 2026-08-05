@@ -1,33 +1,45 @@
 package com.bank.validation;
 
-import com.bank.service.PasswordPolicyService;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 
-@Component
-@RequiredArgsConstructor
 public class StrongPasswordValidator implements ConstraintValidator<StrongPassword, String> {
-
-    private final PasswordPolicyService passwordPolicyService;
-
-    @Override
-    public boolean isValid(String password, ConstraintValidatorContext context) {
-        // Spring Validation может вызвать этот метод с null или пустой строкой
-        // даже при наличии @NotBlank, поэтому нужно корректно обработать эти случаи
-        if (password == null || password.trim().isEmpty()) {
-            // Возвращаем false для null и пустых строк, но не логируем ошибку
-            // так как @NotBlank уже должен обработать эту ситуацию
-            return false;
-        }
-
-        // Проверяем пароль через сервис политики паролей
-        return passwordPolicyService.validatePassword(password);
-    }
 
     @Override
     public void initialize(StrongPassword constraintAnnotation) {
-        // Инициализация не требуется
+    }
+
+    @Override
+    public boolean isValid(String password, ConstraintValidatorContext context) {
+        if (password == null || password.trim().isEmpty()) {
+            return false;
+        }
+
+        // Проверка минимальной длины
+        if (password.length() < 8) {
+            return false;
+        }
+
+        // Проверка наличия цифр
+        if (!password.matches(".*\\d.*")) {
+            return false;
+        }
+
+        // Проверка наличия строчных букв
+        if (!password.matches(".*[a-z].*")) {
+            return false;
+        }
+
+        // Проверка наличия заглавных букв
+        if (!password.matches(".*[A-Z].*")) {
+            return false;
+        }
+
+        // Проверка наличия специальных символов
+        if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
+            return false;
+        }
+
+        return true;
     }
 }

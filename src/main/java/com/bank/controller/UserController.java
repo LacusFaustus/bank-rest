@@ -4,6 +4,7 @@ import com.bank.entity.User;
 import com.bank.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,7 +15,12 @@ public class UserController {
 
     private final UserService userService;
 
+    /**
+     * Получить профиль текущего пользователя
+     * Доступно всем аутентифицированным пользователям
+     */
     @GetMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<User> getUserProfile(@AuthenticationPrincipal User user) {
         User currentUser = userService.getUserByUsername(user.getUsername());
         // Не возвращаем пароль в ответе
@@ -22,15 +28,40 @@ public class UserController {
         return ResponseEntity.ok(currentUser);
     }
 
+    /**
+     * Получить профиль пользователя по ID
+     * Только для администраторов
+     */
     @GetMapping("/profile/{userId}")
-    public ResponseEntity<User> getUserById(@PathVariable Long userId, @AuthenticationPrincipal User currentUser) {
-        // Только админ может смотреть профили других пользователей
-        if (!currentUser.getRole().equals(User.Role.ROLE_ADMIN)) {
-            return ResponseEntity.status(403).build();
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<User> getUserById(@PathVariable Long userId) {
+        User user = userService.getUserById(userId);
+        user.setPassword(null); // Не возвращаем пароль
+        return ResponseEntity.ok(user);
+    }
+
+    /**
+     * Обновить профиль текущего пользователя
+     * Доступно всем аутентифицированным пользователям
+     */
+    @PutMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<User> updateUserProfile(
+            @AuthenticationPrincipal User currentUser,
+            @RequestBody User updatedUser) {
+
+        // Пользователь может обновлять только свой профиль
+        User user = userService.getUserByUsername(currentUser.getUsername());
+
+        // Обновляем разрешенные поля
+        if (updatedUser.getEmail() != null) {
+            user.setEmail(updatedUser.getEmail());
         }
 
-        User user = userService.getUserById(userId);
-        user.setPassword(null);
-        return ResponseEntity.ok(user);
+        // Сохраняем обновленного пользователя
+        User savedUser = userService.updateUser(user);
+        savedUser.setPassword(null);
+
+        return ResponseEntity.ok(savedUser);
     }
 }

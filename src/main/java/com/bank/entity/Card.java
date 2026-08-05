@@ -7,7 +7,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 @Entity
 @Table(name = "cards")
@@ -17,18 +16,22 @@ import java.util.Objects;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"user", "cardNumber"})
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // Явно указываем поля для equals/hashCode
 public class Card {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include // Включаем id в equals/hashCode
     private Long id;
 
     @Column(name = "card_number", nullable = false, length = 255)
     private String cardNumber;
 
     @Column(name = "card_holder", nullable = false, length = 100)
+    @EqualsAndHashCode.Include // Включаем cardHolder в equals/hashCode
     private String cardHolder;
 
     @Column(name = "expiry_date", nullable = false)
+    @EqualsAndHashCode.Include // Включаем expiryDate в equals/hashCode
     private LocalDate expiryDate;
 
     @Column(nullable = false, precision = 15, scale = 2)
@@ -64,20 +67,5 @@ public class Card {
 
     public boolean isBlocked() {
         return status == CardStatus.BLOCKED;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Card card = (Card) o;
-        return Objects.equals(id, card.id) &&
-                Objects.equals(cardHolder, card.cardHolder) &&
-                Objects.equals(expiryDate, card.expiryDate);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, cardHolder, expiryDate);
     }
 }
